@@ -4,6 +4,9 @@
 
 # Better xCloud Plus
 
+> [!WARNING]
+> **Versão beta / em testes.** Este projeto ainda está em desenvolvimento e pode apresentar bugs visuais, recursos incompletos, mudanças frequentes ou incompatibilidades temporárias após atualizações do site Xbox. Use por sua conta e risco e mantenha o script atualizado.
+
 **Better xCloud Plus** é uma personalização baseada no Better xCloud para o [Xbox Cloud Gaming](https://www.xbox.com/play). Ela reúne ajustes de interface, qualidade das artes do site, controles avançados de vídeo no navegador e ferramentas para adaptar a experiência ao seu computador, monitor e tipo de jogo.
 
 O objetivo é deixar o Cloud Gaming mais agradável e configurável sem prometer alterações que dependem dos servidores da Microsoft.
