@@ -13,6 +13,7 @@ export class WebGPUPlayer extends BaseCanvasPlayer {
     sampler!: GPUSampler | null;
     bindGroup!: GPUBindGroup | null;
     optionsUpdated: boolean = false;
+    private latencyPolicyKey = '';
     paramsBuffer!: GPUBuffer | null;
     vertexBuffer!: GPUBuffer | null;
 
@@ -112,25 +113,30 @@ export class WebGPUPlayer extends BaseCanvasPlayer {
     private updateCanvas() {
         this.syncOutputResolution();
         const externalTexture = WebGPUPlayer.device.importExternalTexture({ source: this.$video });
+        const latencyOptions = this.getLatencyProtectedOptions();
+        const uniformValues = [
+            this.toFilterId(this.options.processing),
+            this.options.sharpness,
+            this.options.brightness / 100,
+            this.options.contrast / 100,
+            this.options.saturation / 100,
+            latencyOptions.artifactReduction / 100,
+            latencyOptions.fineDetailReconstruction / 100,
+            this.options.vxUpscaleAlgorithm === VxUpscaleAlgorithm.FSR1 ? 1 : this.options.vxUpscaleAlgorithm === VxUpscaleAlgorithm.NIS ? 2 : 0,
+            this.options.vxDynamicReconstruction ? 1 : 0,
+            this.options.vxAdaptiveSharpen ? 1 : 0,
+            this.$canvas.width,
+            this.$canvas.height,
+        ];
+        const policyKey = uniformValues.join(',');
 
-        if (!this.optionsUpdated) {
-            this.paramsBuffer = this.prepareUniformBuffer([
-                this.toFilterId(this.options.processing),
-                this.options.sharpness,
-                this.options.brightness / 100,
-                this.options.contrast / 100,
-                this.options.saturation / 100,
-                this.options.vxArtifactReduction / 100,
-                this.options.vxFineDetailReconstruction / 100,
-                this.options.vxUpscaleAlgorithm === VxUpscaleAlgorithm.FSR1 ? 1 : this.options.vxUpscaleAlgorithm === VxUpscaleAlgorithm.NIS ? 2 : 0,
-                this.options.vxDynamicReconstruction ? 1 : 0,
-                this.options.vxAdaptiveSharpen ? 1 : 0,
-                this.$canvas.width,
-                this.$canvas.height,
-            ], Float32Array);
-
+        if (!this.optionsUpdated || !this.paramsBuffer) {
+            this.paramsBuffer = this.prepareUniformBuffer(uniformValues, Float32Array);
             this.optionsUpdated = true;
+        } else if (this.latencyPolicyKey !== policyKey) {
+            WebGPUPlayer.device.queue.writeBuffer(this.paramsBuffer, 0, new Float32Array(uniformValues));
         }
+        this.latencyPolicyKey = policyKey;
 
         this.bindGroup = WebGPUPlayer.device.createBindGroup({
             layout: this.pipeline!.getBindGroupLayout(0),

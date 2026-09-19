@@ -28,6 +28,7 @@ export class WebGL2Player extends BaseCanvasPlayer {
         const gl = this.gl!;
         const program = this.program!;
         const filterId = this.toFilterId(this.options.processing);
+        const latencyOptions = this.getLatencyProtectedOptions();
 
         this.syncOutputResolution();
         gl.viewport(0, 0, this.$canvas.width, this.$canvas.height);
@@ -40,15 +41,15 @@ export class WebGL2Player extends BaseCanvasPlayer {
         gl.uniform1f(gl.getUniformLocation(program, 'brightness'), this.options.brightness / 100);
         gl.uniform1f(gl.getUniformLocation(program, 'contrast'), this.options.contrast / 100);
         gl.uniform1f(gl.getUniformLocation(program, 'saturation'), this.options.saturation / 100);
-        gl.uniform1f(gl.getUniformLocation(program, 'artifactReduction'), this.options.vxArtifactReduction / 100);
-        gl.uniform1i(gl.getUniformLocation(program, 'antiAliasing'), this.options.vxAntiAliasing === 'fxaa-strong' ? 3 : this.options.vxAntiAliasing === 'fxaa-quality' ? 2 : this.options.vxAntiAliasing === 'fxaa' ? 1 : 0);
+        gl.uniform1f(gl.getUniformLocation(program, 'artifactReduction'), latencyOptions.artifactReduction / 100);
+        gl.uniform1i(gl.getUniformLocation(program, 'antiAliasing'), latencyOptions.antiAliasing === 'fxaa-strong' ? 3 : latencyOptions.antiAliasing === 'fxaa-quality' ? 2 : latencyOptions.antiAliasing === 'fxaa' ? 1 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'generateFrame'), 0);
         gl.uniform1f(gl.getUniformLocation(program, 'interpolation'), 1);
         gl.uniform1i(gl.getUniformLocation(program, 'adaptiveSharpen'), this.options.vxAdaptiveSharpen ? 1 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'dynamicReconstruction'), this.options.vxDynamicReconstruction ? 1 : 0);
-        gl.uniform1i(gl.getUniformLocation(program, 'temporalSuperResolution'), this.options.vxTemporalSuperResolution ? 1 : 0);
+        gl.uniform1i(gl.getUniformLocation(program, 'temporalSuperResolution'), latencyOptions.temporalSuperResolution ? 1 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'hudProtection'), this.options.vxHudProtection ? 1 : 0);
-        gl.uniform1f(gl.getUniformLocation(program, 'fineDetailReconstruction'), this.options.vxFineDetailReconstruction / 100);
+        gl.uniform1f(gl.getUniformLocation(program, 'fineDetailReconstruction'), latencyOptions.fineDetailReconstruction / 100);
         gl.uniform1i(gl.getUniformLocation(program, 'upscaleAlgorithm'), this.options.vxUpscaleAlgorithm === VxUpscaleAlgorithm.FSR1 ? 1 : this.options.vxUpscaleAlgorithm === VxUpscaleAlgorithm.NIS ? 2 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'hasPreviousFrame'), this.hasPreviousFrame ? 1 : 0);
     }
@@ -84,14 +85,17 @@ export class WebGL2Player extends BaseCanvasPlayer {
     private renderTextureFrame(generated: boolean, interpolation: number) {
         const gl = this.gl!;
         const program = this.program!;
+        const latencyOptions = this.getLatencyProtectedOptions();
         gl.useProgram(program);
         gl.uniform1i(gl.getUniformLocation(program, 'generateFrame'), generated ? 1 : 0);
         gl.uniform1f(gl.getUniformLocation(program, 'interpolation'), interpolation);
         gl.uniform1i(gl.getUniformLocation(program, 'adaptiveSharpen'), this.options.vxAdaptiveSharpen ? 1 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'dynamicReconstruction'), this.options.vxDynamicReconstruction ? 1 : 0);
-        gl.uniform1i(gl.getUniformLocation(program, 'temporalSuperResolution'), this.options.vxTemporalSuperResolution ? 1 : 0);
+        gl.uniform1i(gl.getUniformLocation(program, 'temporalSuperResolution'), latencyOptions.temporalSuperResolution ? 1 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'hudProtection'), this.options.vxHudProtection ? 1 : 0);
-        gl.uniform1f(gl.getUniformLocation(program, 'fineDetailReconstruction'), this.options.vxFineDetailReconstruction / 100);
+        gl.uniform1f(gl.getUniformLocation(program, 'fineDetailReconstruction'), latencyOptions.fineDetailReconstruction / 100);
+        gl.uniform1f(gl.getUniformLocation(program, 'artifactReduction'), latencyOptions.artifactReduction / 100);
+        gl.uniform1i(gl.getUniformLocation(program, 'antiAliasing'), latencyOptions.antiAliasing === 'fxaa-strong' ? 3 : latencyOptions.antiAliasing === 'fxaa-quality' ? 2 : latencyOptions.antiAliasing === 'fxaa' ? 1 : 0);
         gl.uniform1i(gl.getUniformLocation(program, 'hasPreviousFrame'), this.hasPreviousFrame ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         this.recordLocalRender();
@@ -129,7 +133,7 @@ export class WebGL2Player extends BaseCanvasPlayer {
             ? Math.min(maxMultiplier, targetMultiplier)
             : maxMultiplier;
 
-        return requestedMultiplier;
+        return Math.min(requestedMultiplier, this.getLatencyProtectedOptions().frameGenerationLimit);
     }
 
     private presentGeneratedFrames(multiplier: number, onComplete: () => void) {

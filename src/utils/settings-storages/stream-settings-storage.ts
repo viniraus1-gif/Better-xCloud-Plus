@@ -369,7 +369,7 @@ export class StreamSettingsStorage extends BaseSettingsStorage<StreamPref> {
             min: 1,
             max: 16,
             experimental: true,
-            note: 'Reservado para proteção automática de qualidade em uma fase posterior.',
+            note: 'Define o tempo máximo de processamento local VX. Se o renderizador ultrapassar esse valor repetidamente, reduz temporariamente os efeitos mais caros e a geração de frames; restaura quando houver folga. Não altera a latência da rede.',
             params: { steps: 1, suffix: ' ms', ticks: 15 },
         },
         [StreamPref.VX_ADAPTIVE_SHARPEN]: {

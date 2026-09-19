@@ -14,6 +14,13 @@ export abstract class BaseCanvasPlayer extends BaseStreamPlayer {
     protected animFrameId: number | null = null;
     protected frameCallback: any;
     private boundDrawFrame: () => void;
+    // This is deliberately an adaptive quality guard, not added network
+    // latency.  It watches the local renderer submission cost and temporarily
+    // simplifies VX when it repeatedly misses the user's chosen budget.
+    private latencyProtectionLevel = 0;
+    private rendererCostAverage = 0;
+    private overBudgetFrames = 0;
+    private underBudgetFrames = 0;
 
     constructor(playerType: StreamPlayerType, $video: HTMLVideoElement, logTag: string) {
         super(playerType, StreamPlayerElement.CANVAS, $video, logTag);
@@ -65,6 +72,56 @@ export abstract class BaseCanvasPlayer extends BaseStreamPlayer {
      */
     getLocalRenderFps(): number | null {
         return null;
+    }
+
+    /** Effective VX values after the local latency guard. Preferences remain
+     * untouched and are restored automatically when the renderer recovers. */
+    protected getLatencyProtectedOptions() {
+        const level = this.latencyProtectionLevel;
+        return {
+            artifactReduction: level >= 2 ? Math.min(this.options.vxArtifactReduction, 15) : level === 1 ? Math.min(this.options.vxArtifactReduction, 30) : this.options.vxArtifactReduction,
+            fineDetailReconstruction: level >= 2 ? Math.min(this.options.vxFineDetailReconstruction, 15) : level === 1 ? Math.min(this.options.vxFineDetailReconstruction, 35) : this.options.vxFineDetailReconstruction,
+            temporalSuperResolution: level === 0 && this.options.vxTemporalSuperResolution,
+            antiAliasing: level >= 2 ? VxAntiAliasing.OFF : level === 1 && this.options.vxAntiAliasing === VxAntiAliasing.FXAA_STRONG ? VxAntiAliasing.FXAA_QUALITY : this.options.vxAntiAliasing,
+            frameGenerationLimit: level >= 2 ? 1 : level === 1 ? 2 : Number.POSITIVE_INFINITY,
+        };
+    }
+
+    getLatencyProtectionStatus() {
+        const labels = ['Normal', 'Reduzida', 'Máxima'];
+        return {
+            level: this.latencyProtectionLevel,
+            label: labels[this.latencyProtectionLevel],
+            rendererMs: this.rendererCostAverage || undefined,
+            budgetMs: this.options.vxLatencyBudget,
+        };
+    }
+
+    private observeRendererCost(durationMs: number) {
+        VxVideoEngine.getInstance().observeRendererDuration(durationMs);
+        this.rendererCostAverage = this.rendererCostAverage
+            ? this.rendererCostAverage * 0.85 + durationMs * 0.15
+            : durationMs;
+
+        const budget = Math.max(1, this.options.vxLatencyBudget || 5);
+        if (this.rendererCostAverage > budget * 0.9) {
+            this.overBudgetFrames++;
+            this.underBudgetFrames = 0;
+            if (this.overBudgetFrames >= 8 && this.latencyProtectionLevel < 2) {
+                this.latencyProtectionLevel++;
+                this.overBudgetFrames = 0;
+            }
+        } else if (this.rendererCostAverage < budget * 0.45) {
+            this.underBudgetFrames++;
+            this.overBudgetFrames = 0;
+            if (this.underBudgetFrames >= 90 && this.latencyProtectionLevel > 0) {
+                this.latencyProtectionLevel--;
+                this.underBudgetFrames = 0;
+            }
+        } else {
+            this.overBudgetFrames = 0;
+            this.underBudgetFrames = 0;
+        }
     }
 
     /** Reallocates only when the requested output changes; source frames stay on GPU. */
@@ -156,7 +213,7 @@ export abstract class BaseCanvasPlayer extends BaseStreamPlayer {
         this.updateFrame();
         // CPU submission time, not GPU completion time. WebGPU/WebGL do not expose
         // portable GPU timing without optional extensions.
-        VxVideoEngine.getInstance().observeRendererDuration(performance.now() - started);
+        this.observeRendererCost(performance.now() - started);
     }
 
     protected setupRendering(): void {

@@ -2245,6 +2245,10 @@ class BaseCanvasPlayer extends BaseStreamPlayer {
  animFrameId = null;
  frameCallback;
  boundDrawFrame;
+ latencyProtectionLevel = 0;
+ rendererCostAverage = 0;
+ overBudgetFrames = 0;
+ underBudgetFrames = 0;
  constructor(playerType, $video, logTag) {
   super(playerType, "canvas", $video, logTag);
   let $canvas = document.createElement("canvas");
@@ -2267,6 +2271,34 @@ class BaseCanvasPlayer extends BaseStreamPlayer {
  }
  getLocalRenderFps() {
   return null;
+ }
+ getLatencyProtectedOptions() {
+  let level = this.latencyProtectionLevel;
+  return {
+   artifactReduction: level >= 2 ? Math.min(this.options.vxArtifactReduction, 15) : level === 1 ? Math.min(this.options.vxArtifactReduction, 30) : this.options.vxArtifactReduction,
+   fineDetailReconstruction: level >= 2 ? Math.min(this.options.vxFineDetailReconstruction, 15) : level === 1 ? Math.min(this.options.vxFineDetailReconstruction, 35) : this.options.vxFineDetailReconstruction,
+   temporalSuperResolution: level === 0 && this.options.vxTemporalSuperResolution,
+   antiAliasing: level >= 2 ? VxAntiAliasing.OFF : level === 1 && this.options.vxAntiAliasing === VxAntiAliasing.FXAA_STRONG ? VxAntiAliasing.FXAA_QUALITY : this.options.vxAntiAliasing,
+   frameGenerationLimit: level >= 2 ? 1 : level === 1 ? 2 : Number.POSITIVE_INFINITY
+  };
+ }
+ getLatencyProtectionStatus() {
+  let labels = ["Normal", "Reduzida", "Máxima"];
+  return {
+   level: this.latencyProtectionLevel,
+   label: labels[this.latencyProtectionLevel],
+   rendererMs: this.rendererCostAverage || void 0,
+   budgetMs: this.options.vxLatencyBudget
+  };
+ }
+ observeRendererCost(durationMs) {
+  VxVideoEngine.getInstance().observeRendererDuration(durationMs), this.rendererCostAverage = this.rendererCostAverage ? this.rendererCostAverage * 0.85 + durationMs * 0.15 : durationMs;
+  let budget = Math.max(1, this.options.vxLatencyBudget || 5);
+  if (this.rendererCostAverage > budget * 0.9) {
+   if (this.overBudgetFrames++, this.underBudgetFrames = 0, this.overBudgetFrames >= 8 && this.latencyProtectionLevel < 2) this.latencyProtectionLevel++, this.overBudgetFrames = 0;
+  } else if (this.rendererCostAverage < budget * 0.45) {
+   if (this.underBudgetFrames++, this.overBudgetFrames = 0, this.underBudgetFrames >= 90 && this.latencyProtectionLevel > 0) this.latencyProtectionLevel--, this.underBudgetFrames = 0;
+  } else this.overBudgetFrames = 0, this.underBudgetFrames = 0;
  }
  syncOutputResolution() {
   let sourceWidth = this.$video.videoWidth || 1920, sourceHeight = this.$video.videoHeight || 1080, target = this.options.vxUpscaleTarget, height = sourceHeight;
@@ -2300,7 +2332,7 @@ class BaseCanvasPlayer extends BaseStreamPlayer {
   if (this.isStopped) return;
   if (this.animFrameId = this.frameCallback(this.boundDrawFrame), !this.shouldDraw()) return;
   let started = performance.now();
-  this.updateFrame(), VxVideoEngine.getInstance().observeRendererDuration(performance.now() - started);
+  this.updateFrame(), this.observeRendererCost(performance.now() - started);
  }
  setupRendering() {
   this.animFrameId = this.frameCallback(this.boundDrawFrame);
@@ -2313,6 +2345,7 @@ class WebGPUPlayer extends BaseCanvasPlayer {
  sampler;
  bindGroup;
  optionsUpdated = !1;
+ latencyPolicyKey = "";
  paramsBuffer;
  vertexBuffer;
  static async prepare() {
@@ -2395,22 +2428,23 @@ fn fsMain(input: VertexOutput) -> @location(0) vec4<f32> {let texSize = vec2<f32
  }
  updateCanvas() {
   this.syncOutputResolution();
-  let externalTexture = WebGPUPlayer.device.importExternalTexture({ source: this.$video });
-  if (!this.optionsUpdated) this.paramsBuffer = this.prepareUniformBuffer([
-    this.toFilterId(this.options.processing),
-    this.options.sharpness,
-    this.options.brightness / 100,
-    this.options.contrast / 100,
-    this.options.saturation / 100,
-    this.options.vxArtifactReduction / 100,
-    this.options.vxFineDetailReconstruction / 100,
-    this.options.vxUpscaleAlgorithm === "fsr1" ? 1 : this.options.vxUpscaleAlgorithm === "nis" ? 2 : 0,
-    this.options.vxDynamicReconstruction ? 1 : 0,
-    this.options.vxAdaptiveSharpen ? 1 : 0,
-    this.$canvas.width,
-    this.$canvas.height
-   ], Float32Array), this.optionsUpdated = !0;
-  this.bindGroup = WebGPUPlayer.device.createBindGroup({
+  let externalTexture = WebGPUPlayer.device.importExternalTexture({ source: this.$video }), latencyOptions = this.getLatencyProtectedOptions(), uniformValues = [
+   this.toFilterId(this.options.processing),
+   this.options.sharpness,
+   this.options.brightness / 100,
+   this.options.contrast / 100,
+   this.options.saturation / 100,
+   latencyOptions.artifactReduction / 100,
+   latencyOptions.fineDetailReconstruction / 100,
+   this.options.vxUpscaleAlgorithm === "fsr1" ? 1 : this.options.vxUpscaleAlgorithm === "nis" ? 2 : 0,
+   this.options.vxDynamicReconstruction ? 1 : 0,
+   this.options.vxAdaptiveSharpen ? 1 : 0,
+   this.$canvas.width,
+   this.$canvas.height
+  ], policyKey = uniformValues.join(",");
+  if (!this.optionsUpdated || !this.paramsBuffer) this.paramsBuffer = this.prepareUniformBuffer(uniformValues, Float32Array), this.optionsUpdated = !0;
+  else if (this.latencyPolicyKey !== policyKey) WebGPUPlayer.device.queue.writeBuffer(this.paramsBuffer, 0, new Float32Array(uniformValues));
+  this.latencyPolicyKey = policyKey, this.bindGroup = WebGPUPlayer.device.createBindGroup({
    layout: this.pipeline.getBindGroupLayout(0),
    entries: [
     { binding: 0, resource: this.sampler },
@@ -2757,7 +2791,7 @@ class StreamSettingsStorage extends BaseSettingsStorage {
    min: 1,
    max: 16,
    experimental: !0,
-   note: "Reservado para proteção automática de qualidade em uma fase posterior.",
+   note: "Define o tempo máximo de processamento local VX. Se o renderizador ultrapassar esse valor repetidamente, reduz temporariamente os efeitos mais caros e a geração de frames; restaura quando houver folga. Não altera a latência da rede.",
    params: { steps: 1, suffix: " ms", ticks: 15 }
   },
   "vx.adaptiveSharpen": {
@@ -10254,8 +10288,8 @@ class WebGL2Player extends BaseCanvasPlayer {
   super("webgl2", $video, "WebGL2Player");
  }
  updateCanvas() {
-  let gl = this.gl, program = this.program, filterId = this.toFilterId(this.options.processing);
-  this.syncOutputResolution(), gl.viewport(0, 0, this.$canvas.width, this.$canvas.height), gl.uniform2f(gl.getUniformLocation(program, "iResolution"), this.$canvas.width, this.$canvas.height), gl.uniform2f(gl.getUniformLocation(program, "iSourceResolution"), this.$video.videoWidth, this.$video.videoHeight), gl.uniform1i(gl.getUniformLocation(program, "filterId"), filterId), gl.uniform1i(gl.getUniformLocation(program, "qualityMode"), this.options.processingMode === "quality" ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "sharpenFactor"), this.options.sharpness / (this.options.processingMode === "quality" ? 1 : 1.2)), gl.uniform1f(gl.getUniformLocation(program, "brightness"), this.options.brightness / 100), gl.uniform1f(gl.getUniformLocation(program, "contrast"), this.options.contrast / 100), gl.uniform1f(gl.getUniformLocation(program, "saturation"), this.options.saturation / 100), gl.uniform1f(gl.getUniformLocation(program, "artifactReduction"), this.options.vxArtifactReduction / 100), gl.uniform1i(gl.getUniformLocation(program, "antiAliasing"), this.options.vxAntiAliasing === "fxaa-strong" ? 3 : this.options.vxAntiAliasing === "fxaa-quality" ? 2 : this.options.vxAntiAliasing === "fxaa" ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "generateFrame"), 0), gl.uniform1f(gl.getUniformLocation(program, "interpolation"), 1), gl.uniform1i(gl.getUniformLocation(program, "adaptiveSharpen"), this.options.vxAdaptiveSharpen ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "dynamicReconstruction"), this.options.vxDynamicReconstruction ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "temporalSuperResolution"), this.options.vxTemporalSuperResolution ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "hudProtection"), this.options.vxHudProtection ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "fineDetailReconstruction"), this.options.vxFineDetailReconstruction / 100), gl.uniform1i(gl.getUniformLocation(program, "upscaleAlgorithm"), this.options.vxUpscaleAlgorithm === "fsr1" ? 1 : this.options.vxUpscaleAlgorithm === "nis" ? 2 : 0), gl.uniform1i(gl.getUniformLocation(program, "hasPreviousFrame"), this.hasPreviousFrame ? 1 : 0);
+  let gl = this.gl, program = this.program, filterId = this.toFilterId(this.options.processing), latencyOptions = this.getLatencyProtectedOptions();
+  this.syncOutputResolution(), gl.viewport(0, 0, this.$canvas.width, this.$canvas.height), gl.uniform2f(gl.getUniformLocation(program, "iResolution"), this.$canvas.width, this.$canvas.height), gl.uniform2f(gl.getUniformLocation(program, "iSourceResolution"), this.$video.videoWidth, this.$video.videoHeight), gl.uniform1i(gl.getUniformLocation(program, "filterId"), filterId), gl.uniform1i(gl.getUniformLocation(program, "qualityMode"), this.options.processingMode === "quality" ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "sharpenFactor"), this.options.sharpness / (this.options.processingMode === "quality" ? 1 : 1.2)), gl.uniform1f(gl.getUniformLocation(program, "brightness"), this.options.brightness / 100), gl.uniform1f(gl.getUniformLocation(program, "contrast"), this.options.contrast / 100), gl.uniform1f(gl.getUniformLocation(program, "saturation"), this.options.saturation / 100), gl.uniform1f(gl.getUniformLocation(program, "artifactReduction"), latencyOptions.artifactReduction / 100), gl.uniform1i(gl.getUniformLocation(program, "antiAliasing"), latencyOptions.antiAliasing === "fxaa-strong" ? 3 : latencyOptions.antiAliasing === "fxaa-quality" ? 2 : latencyOptions.antiAliasing === "fxaa" ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "generateFrame"), 0), gl.uniform1f(gl.getUniformLocation(program, "interpolation"), 1), gl.uniform1i(gl.getUniformLocation(program, "adaptiveSharpen"), this.options.vxAdaptiveSharpen ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "dynamicReconstruction"), this.options.vxDynamicReconstruction ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "temporalSuperResolution"), latencyOptions.temporalSuperResolution ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "hudProtection"), this.options.vxHudProtection ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "fineDetailReconstruction"), latencyOptions.fineDetailReconstruction / 100), gl.uniform1i(gl.getUniformLocation(program, "upscaleAlgorithm"), this.options.vxUpscaleAlgorithm === "fsr1" ? 1 : this.options.vxUpscaleAlgorithm === "nis" ? 2 : 0), gl.uniform1i(gl.getUniformLocation(program, "hasPreviousFrame"), this.hasPreviousFrame ? 1 : 0);
  }
  updateFrame() {
   let now = performance.now();
@@ -10272,8 +10306,8 @@ class WebGL2Player extends BaseCanvasPlayer {
   this.hasPreviousFrame = !0;
  }
  renderTextureFrame(generated, interpolation) {
-  let gl = this.gl, program = this.program;
-  gl.useProgram(program), gl.uniform1i(gl.getUniformLocation(program, "generateFrame"), generated ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "interpolation"), interpolation), gl.uniform1i(gl.getUniformLocation(program, "adaptiveSharpen"), this.options.vxAdaptiveSharpen ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "dynamicReconstruction"), this.options.vxDynamicReconstruction ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "temporalSuperResolution"), this.options.vxTemporalSuperResolution ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "hudProtection"), this.options.vxHudProtection ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "fineDetailReconstruction"), this.options.vxFineDetailReconstruction / 100), gl.uniform1i(gl.getUniformLocation(program, "hasPreviousFrame"), this.hasPreviousFrame ? 1 : 0), gl.drawArrays(gl.TRIANGLES, 0, 3), this.recordLocalRender();
+  let gl = this.gl, program = this.program, latencyOptions = this.getLatencyProtectedOptions();
+  gl.useProgram(program), gl.uniform1i(gl.getUniformLocation(program, "generateFrame"), generated ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "interpolation"), interpolation), gl.uniform1i(gl.getUniformLocation(program, "adaptiveSharpen"), this.options.vxAdaptiveSharpen ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "dynamicReconstruction"), this.options.vxDynamicReconstruction ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "temporalSuperResolution"), latencyOptions.temporalSuperResolution ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "hudProtection"), this.options.vxHudProtection ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "fineDetailReconstruction"), latencyOptions.fineDetailReconstruction / 100), gl.uniform1f(gl.getUniformLocation(program, "artifactReduction"), latencyOptions.artifactReduction / 100), gl.uniform1i(gl.getUniformLocation(program, "antiAliasing"), latencyOptions.antiAliasing === "fxaa-strong" ? 3 : latencyOptions.antiAliasing === "fxaa-quality" ? 2 : latencyOptions.antiAliasing === "fxaa" ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "hasPreviousFrame"), this.hasPreviousFrame ? 1 : 0), gl.drawArrays(gl.TRIANGLES, 0, 3), this.recordLocalRender();
  }
  recordLocalRender() {
   let now = performance.now();
@@ -10288,8 +10322,8 @@ class WebGL2Player extends BaseCanvasPlayer {
   return this.renderedFrameTimes.length || null;
  }
  getFrameGenerationMultiplier() {
-  let maxMultiplier = this.options.vxFrameGeneration === "4x" ? 4 : this.options.vxFrameGeneration === "3x" ? 3 : this.options.vxFrameGeneration === "2x" ? 2 : this.options.vxFrameGeneration === "custom" ? 8 : 1, baseFps = this.targetFps > 0 && this.targetFps < 60 ? this.targetFps : this.estimatedSourceFps, targetMultiplier = Math.max(1, Math.ceil(this.options.vxFrameTargetFps / Math.max(1, baseFps)));
-  return this.options.vxFrameGeneration === "custom" ? Math.min(maxMultiplier, targetMultiplier) : maxMultiplier;
+  let maxMultiplier = this.options.vxFrameGeneration === "4x" ? 4 : this.options.vxFrameGeneration === "3x" ? 3 : this.options.vxFrameGeneration === "2x" ? 2 : this.options.vxFrameGeneration === "custom" ? 8 : 1, baseFps = this.targetFps > 0 && this.targetFps < 60 ? this.targetFps : this.estimatedSourceFps, targetMultiplier = Math.max(1, Math.ceil(this.options.vxFrameTargetFps / Math.max(1, baseFps))), requestedMultiplier = this.options.vxFrameGeneration === "custom" ? Math.min(maxMultiplier, targetMultiplier) : maxMultiplier;
+  return Math.min(requestedMultiplier, this.getLatencyProtectedOptions().frameGenerationLimit);
  }
  presentGeneratedFrames(multiplier, onComplete) {
   let step = 1, baseFrameInterval = this.targetFps > 0 && this.targetFps < 60 ? 1000 / this.targetFps : 0, presentationInterval = baseFrameInterval ? baseFrameInterval / multiplier : 0, startedAt = performance.now(), scheduleAt = (targetAt, callback) => {
