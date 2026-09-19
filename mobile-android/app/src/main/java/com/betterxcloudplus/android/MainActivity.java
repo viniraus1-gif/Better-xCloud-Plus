@@ -139,6 +139,9 @@ public final class MainActivity extends Activity {
         host = host.toLowerCase(Locale.ROOT);
         return isXboxHost(host)
             || host.equals("microsoft.com") || host.endsWith(".microsoft.com")
+            // Microsoft account sign-in moves through this hostname. Keeping it
+            // in this WebView preserves the authentication cookies for xbox.com.
+            || host.equals("microsoftonline.com") || host.endsWith(".microsoftonline.com")
             || host.equals("live.com") || host.endsWith(".live.com")
             || host.equals("xboxlive.com") || host.endsWith(".xboxlive.com");
     }
