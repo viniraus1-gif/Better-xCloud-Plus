@@ -109,6 +109,13 @@ export class StreamPlayerManager {
             $canvas.style.height = targetHeight;
             $canvas.style.objectFit = targetObjectFit;
 
+            // xCloud may apply its own transform/inset rules to the <video>
+            // on phones (safe areas, portrait-to-landscape transition, etc.).
+            // A canvas is a sibling, so it does not inherit those rules and
+            // used to drift away from the stream on Android. Mirror the visual
+            // geometry while the native video is still measurable.
+            this.syncCanvasLayoutFromVideo();
+
             $video.dispatchEvent(new Event('resize'));
         }
 
@@ -140,6 +147,8 @@ export class StreamPlayerManager {
                 void canvasPlayer.init().then(() => {
                     // Do not hide the known-good stream until the processor initialized.
                     if (this.canvasPlayer === canvasPlayer) {
+                        this.resizePlayer();
+                        this.syncCanvasLayoutFromVideo();
                         this.canvasPlayerReady = true;
                         canvasPlayer.updateOptions(this.playerOptions, true);
                         this.videoPlayer.clearFilters();
@@ -199,6 +208,27 @@ export class StreamPlayerManager {
 
     getVideoPlayerFilterStyle() {
         throw new Error("Method not implemented.");
+    }
+
+    /**
+     * Keep the generated canvas in the same visual box as xCloud's video.
+     * This is particularly important for Android WebView: the page can apply
+     * transforms for the device safe area that are not shared by siblings.
+     */
+    private syncCanvasLayoutFromVideo() {
+        const $canvas = this.canvasPlayer?.getCanvas();
+        if (!$canvas || !this.$video.isConnected) {
+            return;
+        }
+
+        const style = getComputedStyle(this.$video);
+        for (const property of ['position', 'top', 'right', 'bottom', 'left', 'transform', 'transform-origin', 'object-position', 'z-index'] as const) {
+            $canvas.style.setProperty(property, style.getPropertyValue(property));
+        }
+
+        // The canvas displays the stream only; touch/gamepad input must keep
+        // reaching the original xCloud controls positioned above it.
+        $canvas.style.pointerEvents = 'none';
     }
 
     private cleanUpCanvasPlayer() {
