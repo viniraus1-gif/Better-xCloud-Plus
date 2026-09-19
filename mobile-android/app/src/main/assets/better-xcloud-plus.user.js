@@ -10511,7 +10511,7 @@ class StreamPlayerManager {
  }
  switchPlayerType(type, refreshPlayer = !1) {
   if (this.playerType !== type) {
-   let videoClass = BX_FLAGS.DeviceInfo.deviceType === "android-tv" ? "bx-pixel" : "bx-gone";
+   let videoClass = ["android-tv", "android-handheld", "android"].includes(BX_FLAGS.DeviceInfo.deviceType) ? "bx-pixel" : "bx-gone";
    if (this.cleanUpCanvasPlayer(), type === "default") this.$video.classList.remove(videoClass);
    else {
     if (BX_FLAGS.EnableWebGPURenderer && type === "webgpu") this.canvasPlayer = new WebGPUPlayer(this.$video);

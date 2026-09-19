@@ -128,7 +128,13 @@ export class StreamPlayerManager {
 
     switchPlayerType(type: StreamPlayerType, refreshPlayer: boolean = false) {
         if (this.playerType !== type) {
-            const videoClass = BX_FLAGS.DeviceInfo.deviceType === 'android-tv' ? 'bx-pixel' : 'bx-gone';
+            // Android WebView stops decoding and stops requestVideoFrameCallback
+            // when a playing video becomes display:none. Keep a 1px invisible
+            // source alive for both Android TV and handheld devices so the VX
+            // canvas continues receiving frames for upscale/frame generation.
+            const videoClass = ['android-tv', 'android-handheld', 'android'].includes(BX_FLAGS.DeviceInfo.deviceType)
+                ? 'bx-pixel'
+                : 'bx-gone';
 
             // Destroy old player
             this.cleanUpCanvasPlayer();

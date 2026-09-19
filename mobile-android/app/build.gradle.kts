@@ -10,8 +10,8 @@ android {
         applicationId = "com.betterxcloudplus.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.1.9-beta"
+        versionCode = 11
+        versionName = "0.1.10-beta"
     }
 
     buildTypes {
