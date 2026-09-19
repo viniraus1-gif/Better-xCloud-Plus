@@ -19,6 +19,8 @@ export class WebGL2Player extends BaseCanvasPlayer {
     private lastSourceFrameAt = 0;
     private estimatedSourceFps = 60;
     private renderedFrameTimes: number[] = [];
+    private textureWidth = 0;
+    private textureHeight = 0;
 
     constructor($video: HTMLVideoElement) {
         super(StreamPlayerType.WEBGL2, $video, 'WebGL2Player');
@@ -55,6 +57,13 @@ export class WebGL2Player extends BaseCanvasPlayer {
     }
 
     updateFrame() {
+        if (!this.ensureTextureStorage()) {
+            // Android WebView can create the player before the WebRTC video
+            // has metadata. Wait for a real frame instead of allocating 0×0
+            // history textures, which permanently breaks frame generation.
+            return;
+        }
+
         const now = performance.now();
         if (this.lastSourceFrameAt) {
             const instantaneousFps = 1000 / Math.max(1, now - this.lastSourceFrameAt);
@@ -80,6 +89,35 @@ export class WebGL2Player extends BaseCanvasPlayer {
             this.copyCurrentFrame();
         }
         this.hasPreviousFrame = true;
+    }
+
+    /** Allocate frame-history textures only after the stream reports a size. */
+    private ensureTextureStorage(): boolean {
+        const gl = this.gl;
+        const width = this.$video.videoWidth;
+        const height = this.$video.videoHeight;
+        if (!gl || !width || !height || !this.currentTexture || !this.previousTexture || !this.historyTexture) {
+            return false;
+        }
+
+        if (this.textureWidth === width && this.textureHeight === height) {
+            return true;
+        }
+
+        const allocate = (unit: number, texture: WebGLTexture) => {
+            gl.activeTexture(unit);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+        };
+
+        allocate(gl.TEXTURE0, this.currentTexture);
+        allocate(gl.TEXTURE1, this.previousTexture);
+        allocate(gl.TEXTURE2, this.historyTexture);
+        this.textureWidth = width;
+        this.textureHeight = height;
+        this.hasPreviousFrame = false;
+        this.updateCanvas();
+        return true;
     }
 
     private renderTextureFrame(generated: boolean, interpolation: number) {
@@ -283,15 +321,6 @@ export class WebGL2Player extends BaseCanvasPlayer {
         setupTexture(this.currentTexture);
         setupTexture(this.previousTexture);
         setupTexture(this.historyTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.$video.videoWidth, this.$video.videoHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-        // copyTexSubImage2D requires allocated destination storage. Without
-        // these two allocations, some drivers reject the frame-history copy
-        // used by temporal reconstruction and frame generation.
-        gl.bindTexture(gl.TEXTURE_2D, this.previousTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.$video.videoWidth, this.$video.videoHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-        gl.bindTexture(gl.TEXTURE_2D, this.historyTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.$video.videoWidth, this.$video.videoHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
 

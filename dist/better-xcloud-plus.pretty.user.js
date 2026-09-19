@@ -10284,6 +10284,8 @@ class WebGL2Player extends BaseCanvasPlayer {
  lastSourceFrameAt = 0;
  estimatedSourceFps = 60;
  renderedFrameTimes = [];
+ textureWidth = 0;
+ textureHeight = 0;
  constructor($video) {
   super("webgl2", $video, "WebGL2Player");
  }
@@ -10292,6 +10294,7 @@ class WebGL2Player extends BaseCanvasPlayer {
   this.syncOutputResolution(), gl.viewport(0, 0, this.$canvas.width, this.$canvas.height), gl.uniform2f(gl.getUniformLocation(program, "iResolution"), this.$canvas.width, this.$canvas.height), gl.uniform2f(gl.getUniformLocation(program, "iSourceResolution"), this.$video.videoWidth, this.$video.videoHeight), gl.uniform1i(gl.getUniformLocation(program, "filterId"), filterId), gl.uniform1i(gl.getUniformLocation(program, "qualityMode"), this.options.processingMode === "quality" ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "sharpenFactor"), this.options.sharpness / (this.options.processingMode === "quality" ? 1 : 1.2)), gl.uniform1f(gl.getUniformLocation(program, "brightness"), this.options.brightness / 100), gl.uniform1f(gl.getUniformLocation(program, "contrast"), this.options.contrast / 100), gl.uniform1f(gl.getUniformLocation(program, "saturation"), this.options.saturation / 100), gl.uniform1f(gl.getUniformLocation(program, "artifactReduction"), latencyOptions.artifactReduction / 100), gl.uniform1i(gl.getUniformLocation(program, "antiAliasing"), latencyOptions.antiAliasing === "fxaa-strong" ? 3 : latencyOptions.antiAliasing === "fxaa-quality" ? 2 : latencyOptions.antiAliasing === "fxaa" ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "generateFrame"), 0), gl.uniform1f(gl.getUniformLocation(program, "interpolation"), 1), gl.uniform1i(gl.getUniformLocation(program, "adaptiveSharpen"), this.options.vxAdaptiveSharpen ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "dynamicReconstruction"), this.options.vxDynamicReconstruction ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "temporalSuperResolution"), latencyOptions.temporalSuperResolution ? 1 : 0), gl.uniform1i(gl.getUniformLocation(program, "hudProtection"), this.options.vxHudProtection ? 1 : 0), gl.uniform1f(gl.getUniformLocation(program, "fineDetailReconstruction"), latencyOptions.fineDetailReconstruction / 100), gl.uniform1i(gl.getUniformLocation(program, "upscaleAlgorithm"), this.options.vxUpscaleAlgorithm === "fsr1" ? 1 : this.options.vxUpscaleAlgorithm === "nis" ? 2 : 0), gl.uniform1i(gl.getUniformLocation(program, "hasPreviousFrame"), this.hasPreviousFrame ? 1 : 0);
  }
  updateFrame() {
+  if (!this.ensureTextureStorage()) return;
   let now = performance.now();
   if (this.lastSourceFrameAt) {
    let instantaneousFps = 1000 / Math.max(1, now - this.lastSourceFrameAt);
@@ -10304,6 +10307,15 @@ class WebGL2Player extends BaseCanvasPlayer {
   if (this.cancelGeneratedFrames(), shouldGenerate) this.presentGeneratedFrames(multiplier, () => this.copyCurrentFrame());
   else this.renderTextureFrame(!1, 1), this.copyCurrentFrame();
   this.hasPreviousFrame = !0;
+ }
+ ensureTextureStorage() {
+  let gl = this.gl, width = this.$video.videoWidth, height = this.$video.videoHeight;
+  if (!gl || !width || !height || !this.currentTexture || !this.previousTexture || !this.historyTexture) return !1;
+  if (this.textureWidth === width && this.textureHeight === height) return !0;
+  let allocate = (unit, texture) => {
+   gl.activeTexture(unit), gl.bindTexture(gl.TEXTURE_2D, texture), gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+  };
+  return allocate(gl.TEXTURE0, this.currentTexture), allocate(gl.TEXTURE1, this.previousTexture), allocate(gl.TEXTURE2, this.historyTexture), this.textureWidth = width, this.textureHeight = height, this.hasPreviousFrame = !1, this.updateCanvas(), !0;
  }
  renderTextureFrame(generated, interpolation) {
   let gl = this.gl, program = this.program, latencyOptions = this.getLatencyProtectedOptions();
@@ -10388,7 +10400,7 @@ precision mediump float;uniform sampler2D data;uniform sampler2D previousData;un
   let setupTexture = (texture) => {
    gl.bindTexture(gl.TEXTURE_2D, texture), gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !0), gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE), gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE), gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR), gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   };
-  this.currentTexture = gl.createTexture(), this.previousTexture = gl.createTexture(), this.historyTexture = gl.createTexture(), this.copyFramebuffer = gl.createFramebuffer(), this.resources.push(this.currentTexture, this.previousTexture, this.historyTexture, this.copyFramebuffer), setupTexture(this.currentTexture), setupTexture(this.previousTexture), setupTexture(this.historyTexture), gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.$video.videoWidth, this.$video.videoHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null), gl.bindTexture(gl.TEXTURE_2D, this.previousTexture), gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.$video.videoWidth, this.$video.videoHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null), gl.bindTexture(gl.TEXTURE_2D, this.historyTexture), gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.$video.videoWidth, this.$video.videoHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null), gl.activeTexture(gl.TEXTURE0), gl.bindTexture(gl.TEXTURE_2D, this.currentTexture), gl.uniform1i(gl.getUniformLocation(program, "data"), 0), gl.uniform1i(gl.getUniformLocation(program, "previousData"), 1), gl.uniform1i(gl.getUniformLocation(program, "historyData"), 2), gl.activeTexture(gl.TEXTURE1), gl.bindTexture(gl.TEXTURE_2D, this.previousTexture), gl.activeTexture(gl.TEXTURE2), gl.bindTexture(gl.TEXTURE_2D, this.historyTexture);
+  this.currentTexture = gl.createTexture(), this.previousTexture = gl.createTexture(), this.historyTexture = gl.createTexture(), this.copyFramebuffer = gl.createFramebuffer(), this.resources.push(this.currentTexture, this.previousTexture, this.historyTexture, this.copyFramebuffer), setupTexture(this.currentTexture), setupTexture(this.previousTexture), setupTexture(this.historyTexture), gl.activeTexture(gl.TEXTURE0), gl.bindTexture(gl.TEXTURE_2D, this.currentTexture), gl.uniform1i(gl.getUniformLocation(program, "data"), 0), gl.uniform1i(gl.getUniformLocation(program, "previousData"), 1), gl.uniform1i(gl.getUniformLocation(program, "historyData"), 2), gl.activeTexture(gl.TEXTURE1), gl.bindTexture(gl.TEXTURE_2D, this.previousTexture), gl.activeTexture(gl.TEXTURE2), gl.bindTexture(gl.TEXTURE_2D, this.historyTexture);
  }
  destroy() {
   this.cancelGeneratedFrames(), super.destroy();
