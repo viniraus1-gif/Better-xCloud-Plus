@@ -72,6 +72,10 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        settings.setUseWideViewPort(false);
+        settings.setLoadWithOverviewMode(false);
+        settings.setTextZoom(100);
+        settings.setOffscreenPreRaster(true);
         settings.setUserAgentString(XBOX_USER_AGENT);
 
         CookieManager cookies = CookieManager.getInstance();
@@ -121,6 +125,12 @@ public final class MainActivity extends Activity {
         // when the stream launch route becomes active.
         String androidHelper = """
             (() => {
+              window.BX_FLAGS = Object.assign(window.BX_FLAGS || {}, {
+                DeviceInfo: Object.assign((window.BX_FLAGS || {}).DeviceInfo || {}, {
+                  deviceType: 'android-handheld'
+                })
+              });
+              document.documentElement?.setAttribute('data-bx-android-app', 'true');
               const bridge = window.BetterXcloudPlusAndroid;
               let previousStreaming;
               const syncOrientation = () => {
@@ -132,8 +142,33 @@ public final class MainActivity extends Activity {
               };
               const installStyle = () => {
                 const style = document.createElement('style');
-                style.textContent = '.bx-hub-fullscreen-button,.bx-stream-fullscreen-button{display:none!important}';
-                (document.head || document.documentElement).appendChild(style);
+                style.textContent = `
+                  .bx-hub-fullscreen-button,.bx-stream-fullscreen-button{display:none!important}
+                  html[data-bx-android-app=true] { -webkit-tap-highlight-color: transparent; }
+                  @media (pointer:coarse) {
+                    html[data-bx-android-app=true] .bx-settings-dialog {
+                      width:100vw; max-width:100vw; min-height:100dvh; overflow:hidden;
+                    }
+                    html[data-bx-android-app=true] .bx-settings-tabs-container { width:56px; }
+                    html[data-bx-android-app=true] .bx-settings-tabs .bx-settings-tab { min-height:52px; padding:12px; }
+                    html[data-bx-android-app=true] .bx-settings-tabs .bx-settings-tab span { display:none; }
+                    html[data-bx-android-app=true] .bx-settings-tab-contents {
+                      width:calc(100vw - 56px); margin-left:56px; max-height:100dvh;
+                      padding-bottom:env(safe-area-inset-bottom);
+                    }
+                    html[data-bx-android-app=true] .bx-settings-row { gap:12px; padding:14px 12px; }
+                    html[data-bx-android-app=true] .bx-settings-row > span.bx-settings-label { font-size:15px; }
+                    html[data-bx-android-app=true] .bx-settings-dialog :is(button,select,input) { min-height:40px; }
+                    html[data-bx-android-app=true] .bx-number-stepper { min-height:44px; }
+                    html[data-bx-android-app=true] .bx-multiple-options { max-width:100%; }
+                    html[data-bx-android-app=true] .bx-vx-overlay {
+                      right:10px; bottom:calc(10px + env(safe-area-inset-bottom)); max-width:calc(100vw - 20px);
+                    }
+                  }
+                `;
+                const target = document.head || document.documentElement;
+                if (target) target.appendChild(style);
+                else document.addEventListener('DOMContentLoaded', installStyle, { once:true });
               };
               installStyle();
               syncOrientation();
