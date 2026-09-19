@@ -68,7 +68,6 @@ O arquivo final será criado em `dist/better-xcloud-plus.pretty.user.js`.
 
 Existe um port Android em [`mobile-android`](mobile-android). Ele abre o Xbox Cloud Gaming em um WebView de tela cheia e injeta a mesma versão compilada do Better xCloud Plus. Não é um cliente de jogos nativo nem substitui uma conta e acesso elegível ao Cloud Gaming.
 
-Para montar o APK, abra a pasta `mobile-android` no Android Studio; veja o [guia do port Android](mobile-android/README.md). O app está em beta e precisa de Android System WebView atualizado.
 
 ## Perfis sugeridos
 
@@ -83,13 +82,8 @@ Para montar o APK, abra a pasta `mobile-android` no Android Studio; veja o [guia
 
 Requisitos:
 
-- [Bun](https://bun.sh/)
 - Navegador com Tampermonkey para testar o userscript
 
-```powershell
-bun install
-bun build.ts --version 0.1.0-vx.42 --pretty
-```
 
 ## Créditos
 
