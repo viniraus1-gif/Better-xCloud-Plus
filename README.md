@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="resources/logos/better-xcloud-plus.png" alt="Logo Better xCloud Plus" width="320">
+</p>
+
 # Better xCloud Plus
 
 **Better xCloud Plus** é uma personalização baseada no Better xCloud para o [Xbox Cloud Gaming](https://www.xbox.com/play). Ela reúne ajustes de interface, qualidade das artes do site, controles avançados de vídeo no navegador e ferramentas para adaptar a experiência ao seu computador, monitor e tipo de jogo.
