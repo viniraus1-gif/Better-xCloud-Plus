@@ -61,6 +61,14 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Local Android SDK and build output for the experimental APK port
+mobile-android/.android-sdk/
+mobile-android/.tool-download/
+mobile-android/.gradle/
+mobile-android/.gradle-user-home/
+mobile-android/app/build/
+mobile-android/local.properties
+
 # Snowpack dependency directory (https://snowpack.dev/)
 
 web_modules/

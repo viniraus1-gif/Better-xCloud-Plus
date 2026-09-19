@@ -4,7 +4,7 @@ Wrapper Android em tela cheia para `xbox.com/play`. O app injeta a versão compi
 
 ## Abrir e gerar o APK
 
-1. Instale o Android Studio com o Android SDK Platform 36 e JDK 17.
+1. Instale o Android Studio com o Android SDK Platform 35 e JDK 17.
 2. Abra **esta pasta** (`mobile-android`) no Android Studio.
 3. Aguarde a sincronização do Gradle e conecte um celular Android ou abra um emulador.
 4. Use **Run** para testar. Para gerar um APK: **Build → Build APK(s)**.
