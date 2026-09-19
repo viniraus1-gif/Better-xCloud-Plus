@@ -66,7 +66,3 @@ bun build.ts --version 0.1.0-vx.42 --pretty
 ## Créditos
 
 Este projeto é baseado no [Better xCloud](https://github.com/redphx/better-xcloud). Agradecimentos ao projeto original e às tecnologias abertas utilizadas pelos seus recursos visuais.
-
-## Aviso legal
-
-Better xCloud Plus é um projeto independente e não é afiliado, aprovado ou patrocinado pela Microsoft ou Xbox. Xbox e Xbox Cloud Gaming são marcas de seus respectivos proprietários. Use por sua conta e risco.
