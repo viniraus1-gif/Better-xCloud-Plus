@@ -202,7 +202,16 @@ export class StreamStats {
 
     private hasActiveFrameGeneration() {
         const mode = getStreamPref(StreamPref.VX_FRAME_GENERATION);
-        return mode !== VxFrameGenerationMode.OFF && mode !== VxFrameGenerationMode.AUTO;
+        const canvasPlayer = STATES.currentStream.streamPlayerManager?.getCanvasPlayer();
+
+        // A saved preference alone is not evidence that frames are being
+        // generated. On a device without a usable WebGL2 canvas, the player
+        // safely falls back to native video; in that case show the normal
+        // stream FPS instead of a misleading "R —" VX indicator.
+        return mode !== VxFrameGenerationMode.OFF
+            && mode !== VxFrameGenerationMode.AUTO
+            && !!canvasPlayer
+            && canvasPlayer.getLocalRenderFps() !== null;
     }
 
     private renderUpscaleResolution($element: HTMLElement, sourceResolution: string) {

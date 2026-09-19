@@ -22,6 +22,7 @@ export class StreamPlayerManager {
     private playerType: StreamPlayerType = StreamPlayerType.VIDEO;
     private canvasPlayerReady = false;
     private playerOptions: Partial<StreamPlayerOptions> = {};
+    private canvasViewportRect: DOMRect | null = null;
 
     private constructor() {}
 
@@ -222,6 +223,34 @@ export class StreamPlayerManager {
         }
 
         const style = getComputedStyle(this.$video);
+
+        // Android WebView lays out xCloud's native video in a page-sized
+        // container even after the activity rotates. A sibling canvas must be
+        // pinned to the final viewport rect, otherwise it can inherit the
+        // desktop shell's offset while the touch layer stays correct.
+        const rect = this.$video.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+            this.canvasViewportRect = rect;
+        }
+
+        if (BX_FLAGS.DeviceInfo.deviceType === 'android-handheld' && this.canvasViewportRect) {
+            const viewportRect = this.canvasViewportRect;
+            $canvas.style.position = 'fixed';
+            $canvas.style.left = `${viewportRect.left}px`;
+            $canvas.style.top = `${viewportRect.top}px`;
+            $canvas.style.right = 'auto';
+            $canvas.style.bottom = 'auto';
+            $canvas.style.width = `${viewportRect.width}px`;
+            $canvas.style.height = `${viewportRect.height}px`;
+            $canvas.style.margin = '0';
+            $canvas.style.transform = 'none';
+            $canvas.style.transformOrigin = 'center';
+            $canvas.style.objectFit = style.objectFit;
+            $canvas.style.zIndex = style.zIndex === 'auto' ? '0' : style.zIndex;
+            $canvas.style.pointerEvents = 'none';
+            return;
+        }
+
         for (const property of ['position', 'top', 'right', 'bottom', 'left', 'transform', 'transform-origin', 'object-position', 'z-index'] as const) {
             $canvas.style.setProperty(property, style.getPropertyValue(property));
         }

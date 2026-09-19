@@ -3457,8 +3457,8 @@ class StreamStats {
   $element.dataset.vxFrameGeneration = "true", $element.replaceChildren(CE("span", { class: "bx-vx-fps-source" }, `S ${Math.round(streamFps)}`), CE("span", { class: "bx-vx-fps-base", title: "FPS-base enviado para a geração local" }, `B ${baseFps}`), CE("span", { class: "bx-vx-fps-bar", title: "Stream → quadros intermediários locais → renderização local" }, CE("i", { class: "bx-vx-fps-stream" }), CE("i", { class: "bx-vx-fps-generated" })), CE("span", { class: "bx-vx-fps-generated-value" }, localRenderFps ? `R ${localRenderFps}` : "R —"));
  }
  hasActiveFrameGeneration() {
-  let mode = getStreamPref("vx.frameGeneration");
-  return mode !== "off" && mode !== "auto";
+  let mode = getStreamPref("vx.frameGeneration"), canvasPlayer = STATES.currentStream.streamPlayerManager?.getCanvasPlayer();
+  return mode !== "off" && mode !== "auto" && !!canvasPlayer && canvasPlayer.getLocalRenderFps() !== null;
  }
  renderUpscaleResolution($element, sourceResolution) {
   let sourceHeight = Number.parseInt(sourceResolution, 10), outputHeight = STATES.currentStream.streamPlayerManager?.getCanvasPlayer()?.getCanvas().height || 0;
@@ -10469,6 +10469,7 @@ class StreamPlayerManager {
  playerType = "default";
  canvasPlayerReady = !1;
  playerOptions = {};
+ canvasViewportRect = null;
  constructor() {}
  setVideoElement($video) {
   this.$video = $video, this.videoPlayer = new VideoPlayer($video, "VideoPlayer"), this.videoPlayer.init();
@@ -10537,7 +10538,13 @@ class StreamPlayerManager {
  syncCanvasLayoutFromVideo() {
   let $canvas = this.canvasPlayer?.getCanvas();
   if (!$canvas || !this.$video.isConnected) return;
-  let style = getComputedStyle(this.$video);
+  let style = getComputedStyle(this.$video), rect = this.$video.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) this.canvasViewportRect = rect;
+  if (BX_FLAGS.DeviceInfo.deviceType === "android-handheld" && this.canvasViewportRect) {
+   let viewportRect = this.canvasViewportRect;
+   $canvas.style.position = "fixed", $canvas.style.left = `${viewportRect.left}px`, $canvas.style.top = `${viewportRect.top}px`, $canvas.style.right = "auto", $canvas.style.bottom = "auto", $canvas.style.width = `${viewportRect.width}px`, $canvas.style.height = `${viewportRect.height}px`, $canvas.style.margin = "0", $canvas.style.transform = "none", $canvas.style.transformOrigin = "center", $canvas.style.objectFit = style.objectFit, $canvas.style.zIndex = style.zIndex === "auto" ? "0" : style.zIndex, $canvas.style.pointerEvents = "none";
+   return;
+  }
   for (let property of ["position", "top", "right", "bottom", "left", "transform", "transform-origin", "object-position", "z-index"])
    $canvas.style.setProperty(property, style.getPropertyValue(property));
   $canvas.style.pointerEvents = "none";
