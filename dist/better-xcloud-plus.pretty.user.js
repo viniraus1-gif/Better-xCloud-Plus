@@ -10492,7 +10492,7 @@ class StreamPlayerManager {
   } else targetWidth = "100%", targetHeight = "100%", targetObjectFit = PREF_RATIO, $video.dataset.width = window.innerWidth.toString(), $video.dataset.height = window.innerHeight.toString();
   if ($video.style.width = targetWidth, $video.style.height = targetHeight, $video.style.objectFit = targetObjectFit, this.canvasPlayer) {
    let $canvas = this.canvasPlayer.getCanvas();
-   $canvas.style.width = targetWidth, $canvas.style.height = targetHeight, $canvas.style.objectFit = targetObjectFit, $video.dispatchEvent(new Event("resize"));
+   $canvas.style.width = targetWidth, $canvas.style.height = targetHeight, $canvas.style.objectFit = targetObjectFit, this.syncCanvasLayoutFromVideo(), $video.dispatchEvent(new Event("resize"));
   }
   if (isNativeTouchGame && this.playerType !== "default") window.BX_EXPOSED.streamSession.updateDimensions();
  }
@@ -10505,7 +10505,7 @@ class StreamPlayerManager {
     else this.canvasPlayer = new WebGL2Player(this.$video);
     let canvasPlayer = this.canvasPlayer;
     this.canvasPlayerReady = !1, canvasPlayer.init().then(() => {
-     if (this.canvasPlayer === canvasPlayer) this.canvasPlayerReady = !0, canvasPlayer.updateOptions(this.playerOptions, !0), this.videoPlayer.clearFilters(), this.$video.classList.add(videoClass);
+     if (this.canvasPlayer === canvasPlayer) this.resizePlayer(), this.syncCanvasLayoutFromVideo(), this.canvasPlayerReady = !0, canvasPlayer.updateOptions(this.playerOptions, !0), this.videoPlayer.clearFilters(), this.$video.classList.add(videoClass);
     }).catch((error) => {
      if (console.error("[Better xCloud VX] Canvas renderer disabled after initialization failure", error), this.canvasPlayer === canvasPlayer) this.cleanUpCanvasPlayer(), this.playerType = "default", this.$video.classList.remove(videoClass);
     });
@@ -10533,6 +10533,14 @@ class StreamPlayerManager {
  }
  getVideoPlayerFilterStyle() {
   throw Error("Method not implemented.");
+ }
+ syncCanvasLayoutFromVideo() {
+  let $canvas = this.canvasPlayer?.getCanvas();
+  if (!$canvas || !this.$video.isConnected) return;
+  let style = getComputedStyle(this.$video);
+  for (let property of ["position", "top", "right", "bottom", "left", "transform", "transform-origin", "object-position", "z-index"])
+   $canvas.style.setProperty(property, style.getPropertyValue(property));
+  $canvas.style.pointerEvents = "none";
  }
  cleanUpCanvasPlayer() {
   this.canvasPlayer?.destroy(), this.canvasPlayer = null, this.canvasPlayerReady = !1;
