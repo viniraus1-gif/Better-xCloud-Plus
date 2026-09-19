@@ -83,7 +83,10 @@ export abstract class BaseCanvasPlayer extends BaseStreamPlayer {
             fineDetailReconstruction: level >= 2 ? Math.min(this.options.vxFineDetailReconstruction, 15) : level === 1 ? Math.min(this.options.vxFineDetailReconstruction, 35) : this.options.vxFineDetailReconstruction,
             temporalSuperResolution: level === 0 && this.options.vxTemporalSuperResolution,
             antiAliasing: level >= 2 ? VxAntiAliasing.OFF : level === 1 && this.options.vxAntiAliasing === VxAntiAliasing.FXAA_STRONG ? VxAntiAliasing.FXAA_QUALITY : this.options.vxAntiAliasing,
-            frameGenerationLimit: level >= 2 ? 1 : level === 1 ? 2 : Number.POSITIVE_INFINITY,
+            // Keep 2× available even under pressure. Dropping it to 1× made
+            // the enabled option indistinguishable from native video on many
+            // mobile GPUs. Higher 3×/4× modes still step down to 2× first.
+            frameGenerationLimit: level >= 1 ? 2 : Number.POSITIVE_INFINITY,
         };
     }
 

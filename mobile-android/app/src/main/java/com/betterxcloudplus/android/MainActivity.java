@@ -62,6 +62,7 @@ public final class MainActivity extends Activity {
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.BLACK);
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         setContentView(webView);
         webView.addJavascriptInterface(new AndroidBridge(), "BetterXcloudPlusAndroid");
 

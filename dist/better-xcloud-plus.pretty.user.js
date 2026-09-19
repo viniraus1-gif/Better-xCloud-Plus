@@ -2279,7 +2279,7 @@ class BaseCanvasPlayer extends BaseStreamPlayer {
    fineDetailReconstruction: level >= 2 ? Math.min(this.options.vxFineDetailReconstruction, 15) : level === 1 ? Math.min(this.options.vxFineDetailReconstruction, 35) : this.options.vxFineDetailReconstruction,
    temporalSuperResolution: level === 0 && this.options.vxTemporalSuperResolution,
    antiAliasing: level >= 2 ? VxAntiAliasing.OFF : level === 1 && this.options.vxAntiAliasing === VxAntiAliasing.FXAA_STRONG ? VxAntiAliasing.FXAA_QUALITY : this.options.vxAntiAliasing,
-   frameGenerationLimit: level >= 2 ? 1 : level === 1 ? 2 : Number.POSITIVE_INFINITY
+   frameGenerationLimit: level >= 1 ? 2 : Number.POSITIVE_INFINITY
   };
  }
  getLatencyProtectionStatus() {
@@ -10326,7 +10326,7 @@ class WebGL2Player extends BaseCanvasPlayer {
   return Math.min(requestedMultiplier, this.getLatencyProtectedOptions().frameGenerationLimit);
  }
  presentGeneratedFrames(multiplier, onComplete) {
-  let step = 1, baseFrameInterval = this.targetFps > 0 && this.targetFps < 60 ? 1000 / this.targetFps : 0, presentationInterval = baseFrameInterval ? baseFrameInterval / multiplier : 0, startedAt = performance.now(), scheduleAt = (targetAt, callback) => {
+  let step = 1, sourceFps = this.targetFps > 0 && this.targetFps < 60 ? this.targetFps : this.estimatedSourceFps, baseFrameInterval = 1000 / Math.max(1, sourceFps), presentationInterval = baseFrameInterval ? baseFrameInterval / multiplier : 0, startedAt = performance.now(), scheduleAt = (targetAt, callback) => {
    let waitForPresentation = () => {
     if (this.isStopped) return;
     if (performance.now() + 0.5 >= targetAt) {

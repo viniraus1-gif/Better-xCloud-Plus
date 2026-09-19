@@ -138,9 +138,15 @@ export class WebGL2Player extends BaseCanvasPlayer {
 
     private presentGeneratedFrames(multiplier: number, onComplete: () => void) {
         let step = 1;
-        const baseFrameInterval = this.targetFps > 0 && this.targetFps < 60
-            ? 1000 / this.targetFps
-            : 0;
+        // Frame generation has to occupy the time between two *received*
+        // frames. The old logic used a zero interval whenever the configured
+        // cap was 60, so a 24/30 FPS stream drew every synthetic frame during
+        // one compositor refresh. That added GPU work but produced no visible
+        // motion improvement, especially on Android.
+        const sourceFps = this.targetFps > 0 && this.targetFps < 60
+            ? this.targetFps
+            : this.estimatedSourceFps;
+        const baseFrameInterval = 1000 / Math.max(1, sourceFps);
         const presentationInterval = baseFrameInterval ? baseFrameInterval / multiplier : 0;
         const startedAt = performance.now();
 
