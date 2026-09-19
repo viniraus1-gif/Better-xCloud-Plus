@@ -13,7 +13,6 @@ O objetivo é deixar o Cloud Gaming mais agradável e configurável sem prometer
 
 ## Destaques
 
-- Interface em português e identidade visual Better xCloud Plus.
 - Personalização do hub: tamanho dos jogos, bordas, animações, efeito ao passar o mouse e transição ao abrir um jogo.
 - Qualidade das capas, fundos e artes do site em até **100%**, quando a imagem original estiver disponível no servidor.
 - Upscale visual local para a saída da tela, com modos VX, **AMD FSR 1** e **NVIDIA Image Scaling (NIS)**.
