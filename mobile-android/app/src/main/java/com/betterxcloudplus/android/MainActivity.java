@@ -38,6 +38,14 @@ import java.util.Locale;
  */
 public final class MainActivity extends Activity {
     private static final String XBOX_PLAY_URL = "https://www.xbox.com/pt-BR/play";
+    /*
+     * Xbox Cloud Gaming intentionally declines the Android WebView user agent
+     * (it contains "; wv").  Use the desktop Edge identifier so xbox.com
+     * serves the supported web client instead of an empty/black page.
+     */
+    private static final String XBOX_USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            + "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0";
     private static final int AUDIO_PERMISSION_REQUEST = 20;
 
     private WebView webView;
@@ -60,7 +68,8 @@ public final class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setUserAgentString(settings.getUserAgentString() + " BetterXCloudPlusAndroid/0.1");
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        settings.setUserAgentString(XBOX_USER_AGENT);
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
