@@ -1,0 +1,72 @@
+# Better xCloud Plus
+
+**Better xCloud Plus** é uma personalização baseada no Better xCloud para o [Xbox Cloud Gaming](https://www.xbox.com/play). Ela reúne ajustes de interface, qualidade das artes do site, controles avançados de vídeo no navegador e ferramentas para adaptar a experiência ao seu computador, monitor e tipo de jogo.
+
+O objetivo é deixar o Cloud Gaming mais agradável e configurável sem prometer alterações que dependem dos servidores da Microsoft.
+
+## Destaques
+
+- Interface em português e identidade visual Better xCloud Plus.
+- Personalização do hub: tamanho dos jogos, bordas, animações, efeito ao passar o mouse e transição ao abrir um jogo.
+- Qualidade das capas, fundos e artes do site em até **100%**, quando a imagem original estiver disponível no servidor.
+- Upscale visual local para a saída da tela, com modos VX, **AMD FSR 1** e **NVIDIA Image Scaling (NIS)**.
+- Redução de artefatos, nitidez adaptativa, reconstrução de detalhes e reconstrução temporal experimentais.
+- Perfis de configurações sugeridas para menor ou maior qualidade.
+- Modo competitivo para priorizar menor latência, desativando temporariamente os efeitos visuais VX.
+- Indicadores de stream com FPS e resolução de entrada/saída quando houver processamento visual ativo.
+- Compatibilidade com Cloud Gaming e Reprodução Remota dentro do site Xbox.
+
+## Limites importantes
+
+O Better xCloud Plus roda no navegador, depois que o vídeo chega ao seu dispositivo. Portanto:
+
+- Upscale melhora a apresentação local, mas **não transforma o stream em 4K nativo**.
+- A opção de qualidade das imagens altera capas e fundos do site, não o vídeo do jogo.
+- Não é possível forçar bitrate ilimitado, codec, resolução ou FPS enviados pelo servidor.
+- Recursos de geração/interpolação de frames são experimentais, dependem de GPU e navegador e **não reduzem a latência dos comandos**.
+- Resultados variam conforme monitor, GPU, rede, navegador e jogo.
+
+## Instalação
+
+1. Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no seu navegador.
+2. Abra o arquivo gerado: [`dist/better-xcloud-plus.pretty.user.js`](dist/better-xcloud-plus.pretty.user.js).
+3. Confirme a instalação no Tampermonkey.
+4. Abra ou recarregue [xbox.com/play](https://www.xbox.com/play).
+5. Abra o menu do Better xCloud Plus e ajuste as opções.
+
+Para compilar o script manualmente:
+
+```powershell
+C:\Users\Vinicius\.bun\bin\bun.exe build.ts --version 0.1.0-vx.42 --pretty
+```
+
+O arquivo final será criado em `dist/better-xcloud-plus.pretty.user.js`.
+
+## Perfis sugeridos
+
+| Perfil | Indicado para | O que prioriza |
+| --- | --- | --- |
+| Menor qualidade | Dispositivos modestos ou economia | Menos processamento visual |
+| Padrão | Uso diário | Equilíbrio e compatibilidade |
+| Maior qualidade | GPU dedicada e tela maior | Imagens do site em 100% e efeitos visuais VX equilibrados |
+| Competitivo VX | Jogos rápidos | Menor custo visual e menor latência adicional local |
+
+## Desenvolvimento
+
+Requisitos:
+
+- [Bun](https://bun.sh/)
+- Navegador com Tampermonkey para testar o userscript
+
+```powershell
+bun install
+bun build.ts --version 0.1.0-vx.42 --pretty
+```
+
+## Créditos
+
+Este projeto é baseado no [Better xCloud](https://github.com/redphx/better-xcloud). Agradecimentos ao projeto original e às tecnologias abertas utilizadas pelos seus recursos visuais.
+
+## Aviso legal
+
+Better xCloud Plus é um projeto independente e não é afiliado, aprovado ou patrocinado pela Microsoft ou Xbox. Xbox e Xbox Cloud Gaming são marcas de seus respectivos proprietários. Use por sua conta e risco.

@@ -1,0 +1,5 @@
+// ==UserScript==
+// @name         Better xCloud Plus
+// @namespace    better-xcloud-plus
+// @version      [[VERSION]]
+// ==/UserScript==

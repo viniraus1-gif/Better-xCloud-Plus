@@ -1,0 +1,86 @@
+.bx-original-rocket-video {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    /* Black stays transparent over the selected game art; only the bright
+     * rocket and its trail are blended on top. */
+    mix-blend-mode: screen;
+    opacity: .88;
+}
+
+.bx-original-xbox-splash-video {
+    position: absolute;
+    z-index: 10;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+    pointer-events: none;
+}
+
+#game-stream:has(.bx-original-rocket-video) [class*=PureScreens-module__screens] {
+    z-index: 2;
+}
+
+.bx-wait-time-box {
+    position: fixed;
+    top: 0;
+    right: 0;
+    background-color: #000000cc;
+    color: #fff;
+    z-index: var(--bx-wait-time-box-z-index);
+    padding: 12px;
+    border-radius: 0 0 0 8px;
+
+    label {
+        display: block;
+        text-transform: uppercase;
+        text-align: right;
+        font-size: 12px;
+        font-weight: bold;
+        margin: 0;
+    }
+
+    span {
+        display: block;
+        font-family: var(--bx-monospaced-font);
+        text-align: right;
+        font-size: 16px;
+        margin-bottom: 10px;
+
+        &:last-of-type {
+            margin-bottom: 0;
+        }
+    }
+}
+
+.bx-leave-queue-button {
+    position: fixed;
+    z-index: calc(var(--bx-wait-time-box-z-index) + 1);
+    left: 50%;
+    bottom: 82px;
+    transform: translateX(-50%);
+    min-height: 42px;
+    padding: 0 18px;
+    border: 1px solid #ffb3b3;
+    border-radius: 4px;
+    background: #c50f1f;
+    color: #fff;
+    font: 600 15px var(--bx-generic-font);
+    cursor: pointer;
+
+    &:hover, &:focus-visible {
+        background: #e81123;
+        border-color: #fff;
+    }
+
+    &:focus-visible {
+        outline: 2px solid #8bd3ff;
+        outline-offset: 2px;
+    }
+}

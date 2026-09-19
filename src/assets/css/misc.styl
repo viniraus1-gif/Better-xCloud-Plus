@@ -1,0 +1,144 @@
+.bx-product-details-icons {
+    padding: 8px;
+    border-radius: 4px;
+
+    svg {
+        margin-right: 8px;
+    }
+}
+
+.bx-product-details-buttons {
+    display: flex;
+    gap: 10px;
+    flex-direction: row;
+
+    button {
+        max-width: max-content;
+        margin: 10px 0 0 0;
+        display: flex;
+    }
+}
+
+// Premium treatment for the page shown before a game is launched. All rules
+// are scoped to the page marker so the normal hub and stream HUD stay intact.
+html[data-bx-product-details=true] {
+    div[class*=ProductDetailPage-module__backgroundImageGradient] {
+        &::after {
+            background: linear-gradient(90deg, rgba(3, 7, 10, .94) 0%, rgba(4, 10, 14, .76) 38%, rgba(3, 7, 10, .22) 72%, rgba(3, 7, 10, .62) 100%), linear-gradient(0deg, #050708 0%, transparent 58%) !important;
+        }
+    }
+
+    div[class*=ProductDetailPage-module__content],
+    div[class*=ProductDetailPage-module__productDetail] {
+        border-left: 3px solid #39d878;
+        padding-left: 20px;
+        text-shadow: 0 2px 18px #000;
+    }
+
+    div[class*=ProductDetailPage-module] {
+        div[class*=Header-module__gamePassAndInputsContainer] {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid rgba(111, 255, 171, .18);
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(25, 38, 35, .78), rgba(8, 12, 14, .66));
+            box-shadow: 0 12px 34px rgba(0, 0, 0, .28);
+            backdrop-filter: blur(12px);
+        }
+
+        div[class*=ActionButtons-module__container] {
+            display: inline-flex;
+            align-items: stretch;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, .1);
+            border-radius: 12px;
+            background: rgba(9, 14, 16, .7);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, .34);
+            backdrop-filter: blur(14px);
+
+            button:first-child {
+                min-height: 58px;
+                padding-inline: 22px;
+                border: 1px solid rgba(174, 255, 199, .3);
+                border-radius: 8px;
+                background: linear-gradient(135deg, #087d41, #14ae61) !important;
+                box-shadow: 0 8px 20px rgba(14, 174, 91, .28);
+                letter-spacing: .2px;
+
+                &:hover, &:focus {
+                    background: linear-gradient(135deg, #0b9950, #22c770) !important;
+                    box-shadow: 0 10px 26px rgba(25, 210, 111, .42);
+                }
+            }
+
+            button:not(:first-child) {
+                border-radius: 8px;
+                background: rgba(255, 255, 255, .07) !important;
+            }
+        }
+
+        div[class*=Header-module__header] {
+            h1, h2 {
+                letter-spacing: -.4px;
+                text-shadow: 0 3px 22px #000;
+            }
+        }
+    }
+}
+
+@media (min-width: 568px) and (max-height: 480px) {
+    .bx-product-details-buttons {
+        flex-direction: column;
+
+        button {
+            margin: 8px 0 0 10px;
+        }
+    }
+}
+// Hub-only browser fullscreen control.
+.bx-hub-fullscreen-button {
+    display: inline-flex;
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    // The Xbox header's action group uses a reversed row, so the visible gap
+    // before this button is its left margin.
+    margin-right: 0;
+    margin-left: 18px;
+    padding: 0;
+    border: 1px solid #ffffff2b;
+    border-radius: 4px;
+    opacity: .9;
+    transition: transform 160ms ease, opacity 160ms ease, background-color 160ms ease;
+
+    svg {
+        width: 19px;
+        height: 19px;
+        margin: 0;
+    }
+
+    &:hover, &:focus-visible, &.bx-hub-controller-focused {
+        opacity: 1;
+        transform: scale(1.06);
+        border-color: #62e878;
+        box-shadow: 0 0 0 2px #62e878, 0 0 12px #28b84a66;
+    }
+
+    &.bx-hub-fullscreen-active {
+        opacity: 1;
+        background-color: #107c10;
+    }
+
+}
+
+:fullscreen .bx-hide-in-browser-fullscreen {
+    display: none !important;
+}

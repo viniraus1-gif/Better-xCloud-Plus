@@ -1,0 +1,14 @@
+// ==UserScript==
+// @name         Better xCloud Plus
+// @namespace    better-xcloud-plus
+// @version      [[VERSION]]
+// @description  Improve Xbox Cloud Gaming (xCloud) experience
+// @author       Better xCloud Plus contributors
+// @license      MIT
+// @match        https://www.xbox.com/*/play*
+// @match        https://www.xbox.com/*/auth/msa?*loggedIn*
+// @exclude      https://www.xbox.com/*/xbox-game-pass/play-day-one
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+"use strict";
