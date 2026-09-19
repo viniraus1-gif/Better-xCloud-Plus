@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -61,6 +63,7 @@ public final class MainActivity extends Activity {
         webView = new WebView(this);
         webView.setBackgroundColor(Color.BLACK);
         setContentView(webView);
+        webView.addJavascriptInterface(new AndroidBridge(), "BetterXcloudPlusAndroid");
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -112,8 +115,44 @@ public final class MainActivity extends Activity {
     }
 
     private String wrapScript(String script) {
-        return "if (!window.__betterXcloudPlusAndroidInjected) { window.__betterXcloudPlusAndroidInjected = true;\n"
+        // The native app is already immersive, so browser fullscreen controls
+        // only cause a duplicate action on Android.  Route changes in xCloud
+        // are handled as a SPA, therefore notify the activity continuously
+        // when the stream launch route becomes active.
+        String androidHelper = """
+            (() => {
+              const bridge = window.BetterXcloudPlusAndroid;
+              let previousStreaming;
+              const syncOrientation = () => {
+                const streaming = /\\/play\\/(?:consoles\\/)?launch\\//.test(location.pathname);
+                if (streaming !== previousStreaming) {
+                  previousStreaming = streaming;
+                  bridge?.setStreaming(streaming);
+                }
+              };
+              const installStyle = () => {
+                const style = document.createElement('style');
+                style.textContent = '.bx-hub-fullscreen-button,.bx-stream-fullscreen-button{display:none!important}';
+                (document.head || document.documentElement).appendChild(style);
+              };
+              installStyle();
+              syncOrientation();
+              window.setInterval(syncOrientation, 400);
+            })();
+            """;
+
+        return androidHelper
+            + "\nif (!window.__betterXcloudPlusAndroidInjected) { window.__betterXcloudPlusAndroidInjected = true;\n"
             + script + "\n}";
+    }
+
+    private final class AndroidBridge {
+        @JavascriptInterface
+        public void setStreaming(boolean streaming) {
+            runOnUiThread(() -> setRequestedOrientation(streaming
+                ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
     }
 
     private void injectFallback(WebView view) {
@@ -207,6 +246,9 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
+            setRequestedOrientation(isStreamUrl(url)
+                ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
             injectFallback(view);
         }
 
@@ -217,6 +259,12 @@ public final class MainActivity extends Activity {
             recreate();
             return true;
         }
+    }
+
+    private boolean isStreamUrl(@Nullable String url) {
+        if (url == null) return false;
+        String path = Uri.parse(url).getPath();
+        return path != null && (path.contains("/play/launch/") || path.contains("/play/consoles/launch/"));
     }
 
     private final class XboxChromeClient extends WebChromeClient {
