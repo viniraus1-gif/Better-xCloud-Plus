@@ -32,11 +32,27 @@ O Better xCloud Plus roda no navegador, depois que o vídeo chega ao seu disposi
 
 ## Instalação
 
-1. Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no seu navegador.
-2. Abra o arquivo gerado: [`dist/better-xcloud-plus.pretty.user.js`](dist/better-xcloud-plus.pretty.user.js).
-3. Confirme a instalação no Tampermonkey.
-4. Abra ou recarregue [xbox.com/play](https://www.xbox.com/play).
-5. Abra o menu do Better xCloud Plus e ajuste as opções.
+### Links necessários
+
+| Necessário | Link |
+| --- | --- |
+| Navegador recomendado | [Microsoft Edge](https://www.microsoft.com/edge/download) · [Google Chrome](https://www.google.com/chrome/) · [Mozilla Firefox](https://www.mozilla.org/firefox/new/) |
+| Extensão para executar o script | [Tampermonkey](https://www.tampermonkey.net/) |
+| Instalar/atualizar Better xCloud Plus | [Clique aqui para instalar o script](https://raw.githubusercontent.com/viniraus1-gif/Better-xCloud-Plus/main/dist/better-xcloud-plus.pretty.user.js) |
+| Abrir o serviço | [Xbox Cloud Gaming](https://www.xbox.com/pt-BR/play) |
+| Conta | [Entrar ou criar conta Microsoft](https://account.microsoft.com/) |
+
+Você precisa de uma conta Microsoft e de acesso a um jogo disponível no Cloud Gaming — por assinatura compatível ou por compra, quando o jogo permitir transmissão própria.
+
+### Passo a passo
+
+1. Instale um dos navegadores indicados acima. O Edge é o recomendado para testar todos os recursos do xCloud.
+2. Instale o [Tampermonkey](https://www.tampermonkey.net/) para o seu navegador.
+3. Abra o link **[Clique aqui para instalar o script](https://raw.githubusercontent.com/viniraus1-gif/Better-xCloud-Plus/main/dist/better-xcloud-plus.pretty.user.js)** e confirme a instalação no Tampermonkey.
+4. Entre em sua conta e abra o [Xbox Cloud Gaming](https://www.xbox.com/pt-BR/play).
+5. Abra ou inicie um jogo; o menu do Better xCloud Plus aparecerá pelos botões/atalhos adicionados pelo script.
+
+Para atualizar futuramente, abra novamente o mesmo [link de instalação](https://raw.githubusercontent.com/viniraus1-gif/Better-xCloud-Plus/main/dist/better-xcloud-plus.pretty.user.js) e confirme a atualização.
 
 Para compilar o script manualmente:
 
