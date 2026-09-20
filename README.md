@@ -28,8 +28,7 @@ O Better xCloud Plus roda no navegador, depois que o vídeo chega ao seu disposi
 
 - Upscale melhora a apresentação local, mas **não transforma o stream em 4K nativo**.
 - A opção de qualidade das imagens altera capas e fundos do site, não o vídeo do jogo.
-- Não é possível forçar bitrate ilimitado, codec, resolução ou FPS enviados pelo servidor.
-- Recursos de geração/interpolação de frames são experimentais, dependem de GPU e navegador e **não reduzem a latência dos comandos**.
+- Recursos de geração/interpolação de frames são experimentais, dependem de GPU e navegador e **não reduzem a latência dos comandos**, (indisponível no android)
 - Resultados variam conforme monitor, GPU, rede, navegador e jogo.
 
 ## Instalação
@@ -56,17 +55,9 @@ Você precisa de uma conta Microsoft e de acesso a um jogo disponível no Cloud 
 
 Para atualizar futuramente, abra novamente o mesmo [link de instalação](https://raw.githubusercontent.com/viniraus1-gif/Better-xCloud-Plus/main/dist/better-xcloud-plus.pretty.user.js) e confirme a atualização.
 
-Para compilar o script manualmente:
-
-```powershell
-C:\Users\Vinicius\.bun\bin\bun.exe build.ts --version 0.1.0-vx.42 --pretty
-```
-
-O arquivo final será criado em `dist/better-xcloud-plus.pretty.user.js`.
-
 ## Android (APK experimental)
 
-Existe um port Android em [`mobile-android`](mobile-android). Ele abre o Xbox Cloud Gaming em um WebView de tela cheia e injeta a mesma versão compilada do Better xCloud Plus. Não é um cliente de jogos nativo nem substitui uma conta e acesso elegível ao Cloud Gaming.
+Existe um port Android em [`mobile-android`](mobile-android). Ele abre o Xbox Cloud Gaming em um WebView de tela cheia e injeta a mesma versão compilada do Better xCloud Plus. Não é um cliente de jogos nativo nem substitui uma conta e acesso elegível ao Cloud Gaming. (algumas opções do pc estão indisponível pro Android)
 
 
 ## Perfis sugeridos
