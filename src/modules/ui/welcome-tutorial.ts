@@ -13,6 +13,7 @@ export class WelcomeTutorial {
     // even to people who completed the earlier, text-only introduction.
     private static readonly STORAGE_VALUE = '12';
     private static replayListenerRegistered = false;
+    private static lockedElements = new Map<HTMLElement, boolean>();
 
     static setup() {
         if (!WelcomeTutorial.replayListenerRegistered) {
@@ -77,13 +78,36 @@ export class WelcomeTutorial {
                     createButton({
                         label: t('tutorial-skip'),
                         style: ButtonStyle.GHOST | ButtonStyle.FOCUSABLE | ButtonStyle.NORMAL_CASE,
-                        onClick: () => WelcomeTutorial.dismiss($overlay, $backdrop),
+                        onClick: () => WelcomeTutorial.dismiss($overlay, $backdrop, releaseInputLock),
                     }),
                     $back,
                     $continue,
                 ),
             ),
         );
+        const blockKeyboardOutsideTutorial = (event: KeyboardEvent) => {
+            if ($overlay.contains(event.target as Node)) {
+                // Keep the tutorial's buttons usable without allowing global
+                // xCloud keyboard shortcuts to receive the same input.
+                event.stopImmediatePropagation();
+                return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        };
+        const keepFocusInTutorial = (event: FocusEvent) => {
+            if (!$overlay.contains(event.target as Node)) {
+                $continue.focus();
+            }
+        };
+        const releaseInputLock = () => {
+            document.removeEventListener('keydown', blockKeyboardOutsideTutorial, true);
+            document.removeEventListener('keyup', blockKeyboardOutsideTutorial, true);
+            document.removeEventListener('keypress', blockKeyboardOutsideTutorial, true);
+            document.removeEventListener('focusin', keepFocusInTutorial, true);
+            WelcomeTutorial.unlockPage();
+        };
 
         const update = () => {
             const currentStep = steps[step]!;
@@ -121,7 +145,11 @@ export class WelcomeTutorial {
                 settingsShown = true;
                 document.body.classList.add('bx-welcome-tutorial-active');
                 SettingsDialog.getInstance().show();
-                window.setTimeout(() => WelcomeTutorial.highlight(currentStep.tab, currentStep.pref), 50);
+                window.setTimeout(() => {
+                    const $dialog = document.querySelector<HTMLElement>('.bx-settings-dialog');
+                    $dialog && WelcomeTutorial.lockElement($dialog);
+                    WelcomeTutorial.highlight(currentStep.tab, currentStep.pref);
+                }, 50);
                 return;
             }
 
@@ -130,7 +158,7 @@ export class WelcomeTutorial {
 
         $continue.addEventListener('click', () => {
             if (step === steps.length - 1) {
-                WelcomeTutorial.dismiss($overlay, $backdrop);
+                WelcomeTutorial.dismiss($overlay, $backdrop, releaseInputLock);
                 return;
             }
             step++;
@@ -147,6 +175,12 @@ export class WelcomeTutorial {
         });
 
         document.body.append($backdrop, $overlay);
+        WelcomeTutorial.lockPage($overlay, $backdrop);
+        document.addEventListener('keydown', blockKeyboardOutsideTutorial, true);
+        document.addEventListener('keyup', blockKeyboardOutsideTutorial, true);
+        document.addEventListener('keypress', blockKeyboardOutsideTutorial, true);
+        document.addEventListener('focusin', keepFocusInTutorial, true);
+        $continue.focus();
         window.setTimeout(update, 50);
     }
 
@@ -228,10 +262,35 @@ export class WelcomeTutorial {
         }
     }
 
-    private static dismiss($overlay: HTMLElement, $backdrop: HTMLElement) {
+    private static lockPage($overlay: HTMLElement, $backdrop: HTMLElement) {
+        for (const $element of document.body.children) {
+            if ($element !== $overlay && $element !== $backdrop) {
+                WelcomeTutorial.lockElement($element as HTMLElement);
+            }
+        }
+    }
+
+    private static lockElement($element: HTMLElement) {
+        if (!WelcomeTutorial.lockedElements.has($element)) {
+            WelcomeTutorial.lockedElements.set($element, $element.hasAttribute('inert'));
+            $element.setAttribute('inert', '');
+        }
+    }
+
+    private static unlockPage() {
+        for (const [$element, wasAlreadyInert] of WelcomeTutorial.lockedElements) {
+            if (!wasAlreadyInert) {
+                $element.removeAttribute('inert');
+            }
+        }
+        WelcomeTutorial.lockedElements.clear();
+    }
+
+    private static dismiss($overlay: HTMLElement, $backdrop: HTMLElement, releaseInputLock: () => void) {
         window.localStorage.setItem(StorageKey.TUTORIAL_DISMISSED, WelcomeTutorial.STORAGE_VALUE);
         document.body.classList.remove('bx-welcome-tutorial-active');
         WelcomeTutorial.clearHighlightAndFocus();
+        releaseInputLock();
         $overlay.classList.add('bx-welcome-tutorial-closing');
         $backdrop.classList.add('bx-welcome-tutorial-closing');
         window.setTimeout(() => {
