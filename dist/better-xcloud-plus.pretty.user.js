@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.12
+// @version      1.0.13
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.12", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.13", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -525,7 +525,7 @@ var SUPPORTED_LANGUAGES = {
  edit: "Edit",
  "enable-controller-shortcuts": "Enable controller shortcuts",
  "enable-local-co-op-support": "Enable local co-op support",
- "enable-local-co-op-support-note": "Only works with some games",
+ "enable-local-co-op-support-note": "Only works with some games. Play with two controllers, or with one controller and one player using the keyboard—no second controller required.",
  "enable-mic-on-startup": "Enable microphone on game launch",
  "enable-mkb": "Emulate controller with Mouse & Keyboard",
  "enable-quick-glance-mode": 'Enable "Quick Glance" mode',
@@ -1038,6 +1038,7 @@ var SUPPORTED_LANGUAGES = {
   "tutorial-continue": "Continuar",
   "tutorial-start": "Começar",
   "show-tutorial-again": "Ver o tutorial novamente",
+  "enable-local-co-op-support-note": "Funciona apenas com alguns jogos. Permite jogar com dois controles ou com um controle e outra pessoa no teclado, sem precisar de um segundo controle.",
   "pc-only-not-supported-on-mobile": "Exclusivo de PC — não suportado no celular.",
   "pc-only": "Exclusivo de PC",
   "skip-session-rating": "Pular avaliação após a sessão",
@@ -12109,16 +12110,27 @@ class WelcomeTutorial {
    label: t("tutorial-skip"),
    style: 8 | 64 | 4096,
    onClick: () => WelcomeTutorial.dismiss($overlay, $backdrop, releaseInputLock)
-  }), $back, $continue))), blockKeyboardOutsideTutorial = (event) => {
+  }), $back, $continue))), scrollPosition = { x: window.scrollX, y: window.scrollY }, $documentElement = document.documentElement, scrollOverflowStyles = [
+   [$documentElement, $documentElement.style.overflow, $documentElement.style.getPropertyPriority("overflow")],
+   [document.body, document.body.style.overflow, document.body.style.getPropertyPriority("overflow")]
+  ], preventScrolling = (event) => {
+   event.cancelable && event.preventDefault(), event.stopImmediatePropagation();
+  }, restoreScrollPosition = () => window.scrollTo(scrollPosition.x, scrollPosition.y), lockScrolling = () => {
+   $documentElement.style.setProperty("overflow", "hidden", "important"), document.body.style.setProperty("overflow", "hidden", "important"), document.addEventListener("wheel", preventScrolling, { capture: !0, passive: !1 }), document.addEventListener("touchmove", preventScrolling, { capture: !0, passive: !1 }), window.addEventListener("scroll", restoreScrollPosition, !0);
+  }, unlockScrolling = () => {
+   document.removeEventListener("wheel", preventScrolling, !0), document.removeEventListener("touchmove", preventScrolling, !0), window.removeEventListener("scroll", restoreScrollPosition, !0);
+   for (let [$element, value, priority] of scrollOverflowStyles)
+    $element.style.setProperty("overflow", value, priority);
+  }, blockKeyboardOutsideTutorial = (event) => {
    if ($overlay.contains(event.target)) {
-    event.stopImmediatePropagation();
+    if (event.stopImmediatePropagation(), ["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"].includes(event.key)) event.preventDefault();
     return;
    }
    event.preventDefault(), event.stopImmediatePropagation();
   }, keepFocusInTutorial = (event) => {
    if (!$overlay.contains(event.target)) $continue.focus();
   }, releaseInputLock = () => {
-   document.removeEventListener("keydown", blockKeyboardOutsideTutorial, !0), document.removeEventListener("keyup", blockKeyboardOutsideTutorial, !0), document.removeEventListener("keypress", blockKeyboardOutsideTutorial, !0), document.removeEventListener("focusin", keepFocusInTutorial, !0), WelcomeTutorial.unlockPage();
+   document.removeEventListener("keydown", blockKeyboardOutsideTutorial, !0), document.removeEventListener("keyup", blockKeyboardOutsideTutorial, !0), document.removeEventListener("keypress", blockKeyboardOutsideTutorial, !0), document.removeEventListener("focusin", keepFocusInTutorial, !0), unlockScrolling(), WelcomeTutorial.unlockPage();
   }, update = () => {
    let currentStep = steps[step];
    if ($title.textContent = t(currentStep.title), "controllerIcons" in currentStep && currentStep.controllerIcons) WelcomeTutorial.renderControllerIcons($body);
@@ -12150,7 +12162,7 @@ class WelcomeTutorial {
   }), $back.addEventListener("click", () => {
    if (step === 0) return;
    step--, update();
-  }), document.body.append($backdrop, $overlay), WelcomeTutorial.lockPage($overlay, $backdrop), document.addEventListener("keydown", blockKeyboardOutsideTutorial, !0), document.addEventListener("keyup", blockKeyboardOutsideTutorial, !0), document.addEventListener("keypress", blockKeyboardOutsideTutorial, !0), document.addEventListener("focusin", keepFocusInTutorial, !0), $continue.focus(), window.setTimeout(update, 50);
+  }), document.body.append($backdrop, $overlay), WelcomeTutorial.lockPage($overlay, $backdrop), lockScrolling(), document.addEventListener("keydown", blockKeyboardOutsideTutorial, !0), document.addEventListener("keyup", blockKeyboardOutsideTutorial, !0), document.addEventListener("keypress", blockKeyboardOutsideTutorial, !0), document.addEventListener("focusin", keepFocusInTutorial, !0), $continue.focus(), window.setTimeout(update, 50);
  }
  static renderControllerIcons($body) {
   let icon = (value) => CE("span", {

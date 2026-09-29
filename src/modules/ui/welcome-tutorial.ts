@@ -85,11 +85,40 @@ export class WelcomeTutorial {
                 ),
             ),
         );
+        const scrollPosition = { x: window.scrollX, y: window.scrollY };
+        const $documentElement = document.documentElement;
+        const scrollOverflowStyles = [
+            [$documentElement, $documentElement.style.overflow, $documentElement.style.getPropertyPriority('overflow')],
+            [document.body, document.body.style.overflow, document.body.style.getPropertyPriority('overflow')],
+        ] as const;
+        const preventScrolling = (event: Event) => {
+            event.cancelable && event.preventDefault();
+            event.stopImmediatePropagation();
+        };
+        const restoreScrollPosition = () => window.scrollTo(scrollPosition.x, scrollPosition.y);
+        const lockScrolling = () => {
+            $documentElement.style.setProperty('overflow', 'hidden', 'important');
+            document.body.style.setProperty('overflow', 'hidden', 'important');
+            document.addEventListener('wheel', preventScrolling, { capture: true, passive: false });
+            document.addEventListener('touchmove', preventScrolling, { capture: true, passive: false });
+            window.addEventListener('scroll', restoreScrollPosition, true);
+        };
+        const unlockScrolling = () => {
+            document.removeEventListener('wheel', preventScrolling, true);
+            document.removeEventListener('touchmove', preventScrolling, true);
+            window.removeEventListener('scroll', restoreScrollPosition, true);
+            for (const [$element, value, priority] of scrollOverflowStyles) {
+                $element.style.setProperty('overflow', value, priority);
+            }
+        };
         const blockKeyboardOutsideTutorial = (event: KeyboardEvent) => {
             if ($overlay.contains(event.target as Node)) {
                 // Keep the tutorial's buttons usable without allowing global
                 // xCloud keyboard shortcuts to receive the same input.
                 event.stopImmediatePropagation();
+                if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) {
+                    event.preventDefault();
+                }
                 return;
             }
 
@@ -106,6 +135,7 @@ export class WelcomeTutorial {
             document.removeEventListener('keyup', blockKeyboardOutsideTutorial, true);
             document.removeEventListener('keypress', blockKeyboardOutsideTutorial, true);
             document.removeEventListener('focusin', keepFocusInTutorial, true);
+            unlockScrolling();
             WelcomeTutorial.unlockPage();
         };
 
@@ -176,6 +206,7 @@ export class WelcomeTutorial {
 
         document.body.append($backdrop, $overlay);
         WelcomeTutorial.lockPage($overlay, $backdrop);
+        lockScrolling();
         document.addEventListener('keydown', blockKeyboardOutsideTutorial, true);
         document.addEventListener('keyup', blockKeyboardOutsideTutorial, true);
         document.addEventListener('keypress', blockKeyboardOutsideTutorial, true);
