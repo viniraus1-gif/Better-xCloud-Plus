@@ -32,12 +32,20 @@ if (btnSelect && btnStart) {
 
     let comboIntervalMs = 0;
     if (btnSelect.pressed && btnStart.pressed) {
+        if (!self.bxMenuComboStates[currentGamepad.index]) {
+            window.BX_EXPOSED.openSettingsMenu?.();
+        }
         self.bxMenuComboStates[currentGamepad.index] = true;
         comboIntervalMs = 16;
     } else if (self.bxMenuComboStates[currentGamepad.index]) {
-        self.bxMenuComboStates[currentGamepad.index] = false;
-        window.BX_EXPOSED.openSettingsMenu?.();
-        comboIntervalMs = 100;
+        // Keep swallowing both buttons until both are released, so releasing
+        // one a little earlier cannot trigger an action inside the game.
+        if (btnSelect.pressed || btnStart.pressed) {
+            comboIntervalMs = 16;
+        } else {
+            self.bxMenuComboStates[currentGamepad.index] = false;
+            comboIntervalMs = 100;
+        }
     }
 
     if (comboIntervalMs) {

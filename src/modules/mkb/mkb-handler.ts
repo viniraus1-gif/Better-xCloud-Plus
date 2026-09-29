@@ -160,6 +160,11 @@ export class EmulatedMkbHandler extends MkbHandler {
     private mouseDataProvider: MouseDataProvider | undefined;
     private isPolling = false;
     private physicalGamepadPollingId: number | null = null;
+    private physicalMenuButtonStates = new Map<number, {
+        viewPressedAt: number | null;
+        menuPressedAt: number | null;
+        comboActive: boolean;
+    }>();
 
     private prevWheelCode = null;
     private wheelStoppedTimeoutId: number | null = null;
@@ -333,18 +338,20 @@ export class EmulatedMkbHandler extends MkbHandler {
             window.cancelAnimationFrame(this.physicalGamepadPollingId);
             this.physicalGamepadPollingId = null;
         }
+        this.physicalMenuButtonStates.clear();
     }
 
     private toXcloudGamepadMapping($gamepad: Gamepad): XcloudGamepad {
         const button = (index: number) => $gamepad.buttons[index]?.value || 0;
         const axis = (index: number) => $gamepad.axes[index] || 0;
+        const menuButtons = this.getPhysicalMenuButtonValues($gamepad);
 
         return {
             ...generateVirtualControllerMapping($gamepad.index, {
                 A: button(0), B: button(1), X: button(2), Y: button(3),
                 LeftShoulder: button(4), RightShoulder: button(5),
                 LeftTrigger: button(6), RightTrigger: button(7),
-                View: button(8), Menu: button(9),
+                View: menuButtons.view, Menu: menuButtons.menu,
                 LeftThumb: button(10), RightThumb: button(11),
                 DPadUp: button(12), DPadDown: button(13),
                 DPadLeft: button(14), DPadRight: button(15),
@@ -353,6 +360,48 @@ export class EmulatedMkbHandler extends MkbHandler {
                 RightThumbXAxis: axis(2), RightThumbYAxis: -axis(3),
                 Dirty: true,
             }),
+        };
+    }
+
+    private getPhysicalMenuButtonValues($gamepad: Gamepad) {
+        const now = performance.now();
+        const viewPressed = !!$gamepad.buttons[GamepadKey.SELECT]?.pressed;
+        const menuPressed = !!$gamepad.buttons[GamepadKey.START]?.pressed;
+        let state = this.physicalMenuButtonStates.get($gamepad.index);
+        if (!state) {
+            state = { viewPressedAt: null, menuPressedAt: null, comboActive: false };
+            this.physicalMenuButtonStates.set($gamepad.index, state);
+        }
+
+        // Start + Select belongs exclusively to the Better xCloud Plus menu.
+        // Delay each standalone button briefly so the first part of the combo
+        // never leaks into the game before the second button is pressed.
+        if (viewPressed && menuPressed) {
+            state.comboActive = true;
+            state.viewPressedAt = null;
+            state.menuPressedAt = null;
+            return { view: 0, menu: 0 };
+        }
+
+        // Keep swallowing both buttons until they have both been released.
+        if (state.comboActive) {
+            if (!viewPressed && !menuPressed) {
+                state.comboActive = false;
+            }
+            return { view: 0, menu: 0 };
+        }
+
+        state.viewPressedAt = viewPressed ? (state.viewPressedAt ?? now) : null;
+        state.menuPressedAt = menuPressed ? (state.menuPressedAt ?? now) : null;
+        const gracePeriod = 120;
+
+        return {
+            view: state.viewPressedAt !== null && now - state.viewPressedAt >= gracePeriod
+                ? ($gamepad.buttons[GamepadKey.SELECT]?.value || 0)
+                : 0,
+            menu: state.menuPressedAt !== null && now - state.menuPressedAt >= gracePeriod
+                ? ($gamepad.buttons[GamepadKey.START]?.value || 0)
+                : 0,
         };
     }
 
