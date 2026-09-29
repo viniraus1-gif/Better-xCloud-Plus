@@ -4554,6 +4554,7 @@ class EmulatedMkbHandler extends MkbHandler {
  physicalGamepadPollingId = null;
  nativeGamepadPollingRestoreId = null;
  nativeGamepadPollingWasDisabled = null;
+ blockPhysicalInputUntilReleased = !1;
  physicalMenuButtonStates = new Map;
  prevWheelCode = null;
  wheelStoppedTimeoutId = null;
@@ -4628,7 +4629,12 @@ class EmulatedMkbHandler extends MkbHandler {
     this.stopPhysicalGamepadBridge();
     return;
    }
-   let mappings = Array.from(this.nativeGetGamepads() || []).filter(($gamepad) => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID).map(($gamepad) => this.toXcloudGamepadMapping($gamepad));
+   let gamepads = Array.from(this.nativeGetGamepads() || []).filter(($gamepad) => !!$gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID);
+   if (window.BX_EXPOSED.isNavigationDialogShowing) this.blockPhysicalInputUntilReleased = !0;
+   let allInputsReleased = gamepads.every(($gamepad) => $gamepad.buttons.every((button) => !button.pressed) && $gamepad.axes.every((axis) => Math.abs(axis) < 0.15));
+   if (!window.BX_EXPOSED.isNavigationDialogShowing && allInputsReleased) this.blockPhysicalInputUntilReleased = !1;
+   let mappings = gamepads.map(($gamepad) => this.blockPhysicalInputUntilReleased ? generateVirtualControllerMapping($gamepad.index, { Dirty: !0 }) : this.toXcloudGamepadMapping($gamepad));
+   if (window.BX_EXPOSED.isNavigationDialogShowing) this.blockPhysicalInputUntilReleased = !0, mappings = gamepads.map(($gamepad) => generateVirtualControllerMapping($gamepad.index, { Dirty: !0 }));
    if (mappings.length) window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), mappings);
    this.physicalGamepadPollingId = window.requestAnimationFrame(poll);
   };
@@ -4641,7 +4647,8 @@ class EmulatedMkbHandler extends MkbHandler {
  restoreNativeGamepadPollingWhenButtonsAreReleased() {
   if (this.nativeGamepadPollingWasDisabled === null || this.nativeGamepadPollingRestoreId !== null) return;
   let restore = () => {
-   if (Array.from(this.nativeGetGamepads() || []).some(($gamepad) => $gamepad?.connected && ($gamepad.buttons[8]?.pressed || $gamepad.buttons[9]?.pressed))) {
+   let menuButtonHeld = Array.from(this.nativeGetGamepads() || []).some(($gamepad) => $gamepad?.connected && ($gamepad.buttons[8]?.pressed || $gamepad.buttons[9]?.pressed));
+   if (window.BX_EXPOSED.isNavigationDialogShowing || menuButtonHeld) {
     this.nativeGamepadPollingRestoreId = window.requestAnimationFrame(restore);
     return;
    }
@@ -6012,6 +6019,7 @@ class NavigationDialogManager {
  gamepadHoldingIntervalId = null;
  menuComboPollingIntervalId = null;
  menuComboStates = {};
+ gamepadPollingWasDisabled = !1;
  $overlay;
  $container;
  dialog = null;
@@ -6136,7 +6144,11 @@ class NavigationDialogManager {
   this.gamepadHoldingIntervalId && window.clearInterval(this.gamepadHoldingIntervalId), this.gamepadHoldingIntervalId = null;
  }
  show(dialog, configs = {}, clearStack = !1) {
-  this.clearGamepadHoldingInterval(), BxEventBus.Script.emit("dialog.shown", {}), window.BX_EXPOSED.disableGamepadPolling = !0, document.body.classList.add("bx-no-scroll"), this.unmountCurrentDialog(), this.dialogsStack.push(dialog), this.dialog = dialog, dialog.onBeforeMount(configs), this.$container.appendChild(dialog.getContent()), dialog.onMounted(configs), this.$overlay.classList.remove("bx-gone"), this.$overlay.classList.toggle("bx-invisible", !dialog.isOverlayVisible()), this.$container.classList.remove("bx-gone"), this.$container.addEventListener("keydown", this), this.startGamepadPolling();
+  if (this.clearGamepadHoldingInterval(), BxEventBus.Script.emit("dialog.shown", {}), !window.BX_EXPOSED.isNavigationDialogShowing) this.gamepadPollingWasDisabled = window.BX_EXPOSED.disableGamepadPolling;
+  window.BX_EXPOSED.isNavigationDialogShowing = !0, window.BX_EXPOSED.disableGamepadPolling = !0;
+  let neutralGamepads = Array.from(window.navigator.getGamepads() || []).filter(($gamepad) => !!$gamepad?.connected).map(($gamepad) => generateVirtualControllerMapping($gamepad.index, { Dirty: !0 }));
+  if (neutralGamepads.length) window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), neutralGamepads);
+  document.body.classList.add("bx-no-scroll"), this.unmountCurrentDialog(), this.dialogsStack.push(dialog), this.dialog = dialog, dialog.onBeforeMount(configs), this.$container.appendChild(dialog.getContent()), dialog.onMounted(configs), this.$overlay.classList.remove("bx-gone"), this.$overlay.classList.toggle("bx-invisible", !dialog.isOverlayVisible()), this.$container.classList.remove("bx-gone"), this.$container.addEventListener("keydown", this), this.startGamepadPolling();
  }
  hide() {
   if (this.clearGamepadHoldingInterval(), !this.isShowing()) return;
@@ -6144,7 +6156,9 @@ class NavigationDialogManager {
    let dialogIndex = this.dialogsStack.indexOf(this.dialog);
    if (dialogIndex > -1) this.dialogsStack = this.dialogsStack.slice(0, dialogIndex);
   }
-  if (this.unmountCurrentDialog(), window.BX_EXPOSED.disableGamepadPolling = !1, this.dialogsStack.length) this.dialogsStack[this.dialogsStack.length - 1].show();
+  this.unmountCurrentDialog();
+  let hasPreviousDialog = this.dialogsStack.length > 0;
+  if (window.BX_EXPOSED.isNavigationDialogShowing = hasPreviousDialog, window.BX_EXPOSED.disableGamepadPolling = hasPreviousDialog ? !0 : this.gamepadPollingWasDisabled, this.dialogsStack.length) this.dialogsStack[this.dialogsStack.length - 1].show();
  }
  focus($elm) {
   if (!$elm) return !1;
@@ -9915,6 +9929,7 @@ var BxExposed = {
   }
  },
  disableGamepadPolling: !1,
+ isNavigationDialogShowing: !1,
  openSettingsMenu: () => (window.dispatchEvent(new Event(BxEvent.OPEN_SETTINGS_MENU)), !0),
  backButtonPressed: () => {
   let navigationDialogManager = NavigationDialogManager.getInstance();

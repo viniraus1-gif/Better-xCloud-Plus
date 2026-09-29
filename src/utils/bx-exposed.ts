@@ -213,6 +213,7 @@ export const BxExposed = {
     },
 
     disableGamepadPolling: false,
+    isNavigationDialogShowing: false,
 
     openSettingsMenu: () => {
         window.dispatchEvent(new Event(BxEvent.OPEN_SETTINGS_MENU));

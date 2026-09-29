@@ -9,6 +9,7 @@ import { calculateSelectBoxes, CE, isElementVisible } from "@/utils/html";
 import { setNearby } from "@/utils/navigation-utils";
 import { BxNumberStepper } from "@/web-components/bx-number-stepper";
 import { STATES } from "@/utils/global";
+import { generateVirtualControllerMapping } from "@/utils/gamepad";
 
 export enum NavigationDirection {
     UP = 1,
@@ -152,6 +153,7 @@ export class NavigationDialogManager {
     private gamepadHoldingIntervalId: number | null = null;
     private menuComboPollingIntervalId: number | null = null;
     private menuComboStates: Record<number, boolean> = {};
+    private gamepadPollingWasDisabled = false;
 
     private $overlay: HTMLElement;
     private $container: HTMLElement;
@@ -447,7 +449,17 @@ export class NavigationDialogManager {
         BxEventBus.Script.emit('dialog.shown', {});
 
         // Stop xCloud's navigation polling
+        if (!window.BX_EXPOSED.isNavigationDialogShowing) {
+            this.gamepadPollingWasDisabled = window.BX_EXPOSED.disableGamepadPolling;
+        }
+        window.BX_EXPOSED.isNavigationDialogShowing = true;
         window.BX_EXPOSED.disableGamepadPolling = true;
+        const neutralGamepads = Array.from(window.navigator.getGamepads() || [])
+            .filter(($gamepad): $gamepad is Gamepad => !!$gamepad?.connected)
+            .map($gamepad => generateVirtualControllerMapping($gamepad.index, { Dirty: true }));
+        if (neutralGamepads.length) {
+            window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), neutralGamepads);
+        }
 
         // Lock scroll bar
         document.body.classList.add('bx-no-scroll');
@@ -511,8 +523,11 @@ export class NavigationDialogManager {
         // Unmount dialog
         this.unmountCurrentDialog();
 
-        // Enable xCloud's navigation polling
-        window.BX_EXPOSED.disableGamepadPolling = false;
+        const hasPreviousDialog = this.dialogsStack.length > 0;
+        window.BX_EXPOSED.isNavigationDialogShowing = hasPreviousDialog;
+        window.BX_EXPOSED.disableGamepadPolling = hasPreviousDialog
+            ? true
+            : this.gamepadPollingWasDisabled;
 
         // Show the last dialog in dialogs stack
         if (this.dialogsStack.length) {

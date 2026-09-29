@@ -162,6 +162,7 @@ export class EmulatedMkbHandler extends MkbHandler {
     private physicalGamepadPollingId: number | null = null;
     private nativeGamepadPollingRestoreId: number | null = null;
     private nativeGamepadPollingWasDisabled: boolean | null = null;
+    private blockPhysicalInputUntilReleased = false;
     private physicalMenuButtonStates = new Map<number, {
         viewPressedAt: number | null;
         menuPressedAt: number | null;
@@ -331,9 +332,30 @@ export class EmulatedMkbHandler extends MkbHandler {
                 return;
             }
 
-            const mappings = Array.from(this.nativeGetGamepads() || [])
-                .filter($gamepad => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID)
-                .map($gamepad => this.toXcloudGamepadMapping($gamepad!));
+            const gamepads = Array.from(this.nativeGetGamepads() || [])
+                .filter(($gamepad): $gamepad is Gamepad => !!$gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID);
+            if (window.BX_EXPOSED.isNavigationDialogShowing) {
+                this.blockPhysicalInputUntilReleased = true;
+            }
+
+            const allInputsReleased = gamepads.every($gamepad =>
+                $gamepad.buttons.every(button => !button.pressed)
+                && $gamepad.axes.every(axis => Math.abs(axis) < 0.15));
+            if (!window.BX_EXPOSED.isNavigationDialogShowing && allInputsReleased) {
+                this.blockPhysicalInputUntilReleased = false;
+            }
+
+            let mappings = gamepads.map($gamepad => this.blockPhysicalInputUntilReleased
+                ? generateVirtualControllerMapping($gamepad.index, { Dirty: true })
+                : this.toXcloudGamepadMapping($gamepad));
+            // Opening the menu can happen while creating a mapping for this
+            // very frame. Replace that frame too, so no direction or button
+            // reaches the stream alongside the shortcut.
+            if (window.BX_EXPOSED.isNavigationDialogShowing) {
+                this.blockPhysicalInputUntilReleased = true;
+                mappings = gamepads.map($gamepad =>
+                    generateVirtualControllerMapping($gamepad.index, { Dirty: true }));
+            }
             if (mappings.length) {
                 window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), mappings);
             }
@@ -361,7 +383,7 @@ export class EmulatedMkbHandler extends MkbHandler {
             const menuButtonHeld = Array.from(this.nativeGetGamepads() || []).some($gamepad =>
                 $gamepad?.connected
                 && ($gamepad.buttons[GamepadKey.SELECT]?.pressed || $gamepad.buttons[GamepadKey.START]?.pressed));
-            if (menuButtonHeld) {
+            if (window.BX_EXPOSED.isNavigationDialogShowing || menuButtonHeld) {
                 this.nativeGamepadPollingRestoreId = window.requestAnimationFrame(restore);
                 return;
             }
