@@ -3,7 +3,7 @@ import { GlobalPref, StorageKey } from "@/enums/pref-keys";
 import { UserAgentProfile } from "@/enums/user-agent";
 import { type SettingDefinition, type SettingDefinitions } from "@/types/setting-definition";
 import { BX_FLAGS } from "../bx-flags";
-import { STATES, AppInterface } from "../global";
+import { STATES } from "../global";
 import { CE } from "../html";
 import { t, SUPPORTED_LANGUAGES } from "../translation";
 import { UserAgent } from "../user-agent";
@@ -89,7 +89,7 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             label: t('region'),
             note: CE('div', false,
                 CE('a', { target: '_blank', href: 'https://umap.openstreetmap.fr/en/map/xbox-cloud-gaming-servers_1135022' }, t('server-locations')),
-                CE('span', { style: 'display:block;margin-top:4px' }, 'Para “burlar” a fila, troque de servidor.'),
+                CE('span', { style: 'display:block;margin-top:4px' }, t('switch-server-to-bypass-queue')),
             ),
             default: 'default',
         },
@@ -159,6 +159,11 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             default: false,
             note: CE('a', { href: 'https://github.com/redphx/better-xcloud/issues/791', target: '_blank' }, '⚠️ ' + t('unexpected-behavior')),
         },
+        [GlobalPref.STREAM_CLOUD_KEEP_ALIVE]: {
+            label: t('keep-cloud-session-alive'),
+            default: false,
+            note: t('keep-cloud-session-alive-note'),
+        },
 
         [GlobalPref.STREAM_CODEC_PROFILE]: {
             label: t('visual-quality'),
@@ -204,18 +209,18 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             default: 90,
             min: 10,
             max: 100,
-            note: 'Aumenta a qualidade solicitada para as artes, capas e fundos do site. Não altera o stream do jogo.',
+            note: t('image-quality-note'),
             params: {
                 steps: 5,
                 exactTicks: 20,
                 hideSlider: true,
                 customTextValue(value, min, max) {
                     if (value === 100) {
-                        return 'Máxima (100%)';
+                        return t('image-quality-maximum');
                     }
 
                     if (value === 95) {
-                        return 'Ultra (95%)';
+                        return t('image-quality-ultra');
                     }
 
                     if (value === 90) {
@@ -311,25 +316,26 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             requiredVariants: 'full',
             label: t('hide-idle-cursor'),
             default: false,
+            desktopOnly: true,
+            unsupported: UserAgent.isMobileDevice(),
+            unsupportedNote: '⚠️ ' + t('pc-only-not-supported-on-mobile'),
         },
         [GlobalPref.UI_DISABLE_FEEDBACK_DIALOG]: {
             requiredVariants: 'full',
-            label: 'Pular avaliação após a sessão',
+            label: t('skip-session-rating'),
             default: false,
-            note: 'Fecha automaticamente a pergunta “Você gostou da experiência?” e mostra um aviso curto.',
+            note: t('skip-session-rating-note'),
         },
 
         [GlobalPref.STREAM_MAX_VIDEO_BITRATE]: {
             requiredVariants: 'full',
             label: t('bitrate-video-maximum'),
-            note: 'Solicita este teto ao servidor durante a negociação WebRTC. Depois de 50 Mb/s, aumente novamente para usar Ilimitado (sem teto local). O valor recebido de verdade continua visível nas Estatísticas e pode ficar menor se o xCloud limitar a sessão.',
+            note: t('bitrate-video-maximum-note'),
             default: 0,
-            min: 1024 * 100,
-            // Keep a visible tail after 50 Mbps. A single virtual step was
-            // technically reachable, but was only a fraction of a pixel on
-            // the range slider and therefore impossible to select by dragging.
-            // Any value in this tail is saved as the unlimited sentinel.
-            max: 55 * 1024 * 1000,
+            // 1–50 Mb/s are real values. The small final catch area snaps to
+            // Unlimited, making the last position easy to reach by dragging.
+            min: 1 * 1024 * 1000,
+            max: 52 * 1024 * 1000,
             transformValue: {
                 get(value) {
                     return value === 0 ? this.max : value;
@@ -340,12 +346,16 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
                 },
             },
             params: {
-                steps: 100 * 1024,
+                steps: 1 * 1024 * 1000,
                 exactTicks: 5 * 1024 * 1000,
+                normalizeValue(value, min, max) {
+                    return value > 50 * 1024 * 1000 ? max : value;
+                },
+                valueBeforeMaximum: 50 * 1024 * 1000,
                 customTextValue: (value: any, min, max) => {
                     value = parseInt(value);
                     if (value > 50 * 1024 * 1000) {
-                        return 'Ilimitado';
+                        return t('unlimited');
                     }
 
                     return (value / (1024 * 1000)).toFixed(1) + ' Mb/s';
@@ -376,10 +386,13 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             requiredVariants: 'full',
             label: t('enable-mkb'),
             default: false,
-            unsupported: !STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb,
+            desktopOnly: true,
+            unsupported: UserAgent.isMobileDevice() || !STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb,
             ready: (setting: SettingDefinition) => {
                 let note;
-                if (setting.unsupported) {
+                if (UserAgent.isMobileDevice()) {
+                    note = t('pc-only-not-supported-on-mobile');
+                } else if (setting.unsupported) {
                     note = t('browser-unsupported-feature');
                 } else {
                     note = t('mkb-disclaimer');
@@ -393,6 +406,7 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             requiredVariants: 'full',
             label: t('native-mkb'),
             default: NativeMkbMode.DEFAULT,
+            desktopOnly: true,
             options: {
                 [NativeMkbMode.DEFAULT]: t('default'),
                 [NativeMkbMode.OFF]: t('off'),
@@ -408,13 +422,21 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
                 } else {
                     delete (setting as any).options[NativeMkbMode.ON];
                 }
+
+                if (UserAgent.isMobileDevice()) {
+                    setting.unsupported = true;
+                    setting.unsupportedValue = NativeMkbMode.OFF;
+                    setting.unsupportedNote = '⚠️ ' + t('pc-only-not-supported-on-mobile');
+                }
             },
         },
 
         [GlobalPref.NATIVE_MKB_FORCED_GAMES]: {
             label: t('force-native-mkb-games'),
             default: [],
-            unsupported: !AppInterface && UserAgent.isMobile(),
+            desktopOnly: true,
+            unsupported: UserAgent.isMobileDevice(),
+            unsupportedNote: '⚠️ ' + t('pc-only-not-supported-on-mobile'),
             ready: (setting: SettingDefinition) => {
                 if (!setting.unsupported) {
                     (setting as any).multipleOptions = GhPagesUtils.getNativeMkbCustomList(true);
@@ -444,12 +466,19 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             default: true,
         },
         [GlobalPref.LOADING_SCREEN_ROCKET]: {
-            label: 'Restaurar animação do foguete',
-            note: 'Usa a animação original da Xbox durante o carregamento. Com “Mostrar arte do jogo” ativado, o foguete fica levemente transparente sobre a capa, sem cobrir o menu. A logo final do Xbox respeita “Pular introdução do Xbox”.',
-            default: 'show',
-            options: {
-                show: 'Ativado',
-                hide: 'Desativado',
+            label: t('restore-rocket-animation'),
+            note: t('restore-rocket-animation-note'),
+            default: true,
+            transformValue: {
+                // Migrate the older show/hide selector to the new checkbox.
+                get(value) {
+                    if (value === 'show') return true;
+                    if (value === 'hide') return false;
+                    return !!value;
+                },
+                set(value) {
+                    return !!value;
+                },
             },
         },
 
@@ -495,23 +524,32 @@ export class GlobalSettingsStorage extends BaseSettingsStorage<GlobalPref> {
             },
         },
 
+        // Kept only to migrate saved settings from older builds. Game-card
+        // wait-time badges are no longer rendered or exposed in the UI.
         [GlobalPref.UI_GAME_CARD_SHOW_WAIT_TIME]: {
             requiredVariants: 'full',
-            label: t('show-wait-time-in-game-card'),
-            default: true,
+            default: false,
         },
+
         [GlobalPref.UI_HUB_CARD_SIZE]: {
-            label: 'Hub Plus: tamanho dos cards', default: 100, min: 75, max: 130,
-            note: 'Muda o espaço ocupado por cada jogo nas fileiras da página inicial.', params: { steps: 5, suffix: '%', ticks: 25 },
+            label: t('hub-card-size'), default: 100, min: 75, max: 130,
+            note: t('hub-card-size-note'), params: { steps: 5, suffix: '%', ticks: 25 },
         },
         [GlobalPref.UI_HUB_CARD_ROUNDED]: {
-            label: 'Hub Plus: cards arredondados', default: true,
+            label: t('hub-rounded-cards'), default: true,
+            note: t('hub-rounded-cards-note'),
         },
         [GlobalPref.UI_HUB_HOVER_EFFECTS]: {
-            label: 'Hub Plus: efeito ao passar o mouse', default: true,
+            label: t('hub-hover-effects'), default: true,
+            note: t('hub-hover-effects-note'),
+            desktopOnly: true,
+            unsupported: UserAgent.isMobileDevice(),
+            unsupportedValue: false,
+            unsupportedNote: '⚠️ ' + t('pc-only-not-supported-on-mobile'),
         },
         [GlobalPref.UI_HUB_ANIMATIONS]: {
-            label: 'Hub Plus: animações dos cards', default: true,
+            label: t('hub-card-animations'), default: true,
+            note: t('hub-card-animations-note'),
         },
 
         [GlobalPref.BLOCK_TRACKING]: {

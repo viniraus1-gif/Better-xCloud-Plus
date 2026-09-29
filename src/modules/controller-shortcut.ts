@@ -1,4 +1,5 @@
 import { GamepadKey } from "@enums/gamepad";
+import { ShortcutAction } from "@/enums/shortcut-actions";
 import { ShortcutHandler } from "@/utils/shortcut-handler";
 
 
@@ -17,17 +18,34 @@ export class ControllerShortcut {
             return false;
         }
 
+        const gamepadIndex = gamepad.index;
+
+        // Move the buttons status from the previous frame to the cache
+        ControllerShortcut.buttonsCache[gamepadIndex] = ControllerShortcut.buttonsStatus[gamepadIndex]?.slice(0) || [];
+        // Clear the buttons status
+        ControllerShortcut.buttonsStatus[gamepadIndex] = [];
+
+        // Start + Select is reserved as a direct way to open Better xCloud
+        // Plus. It avoids relying on the Xbox Guide, which can be unavailable
+        // or delayed while a stream is active.
+        const startAndSelectPressed = gamepad.buttons[GamepadKey.START]?.pressed && gamepad.buttons[GamepadKey.SELECT]?.pressed;
+        if (startAndSelectPressed) {
+            ControllerShortcut.buttonsStatus[gamepadIndex][GamepadKey.START] = true;
+            ControllerShortcut.buttonsStatus[gamepadIndex][GamepadKey.SELECT] = true;
+
+            const comboWasPressed = ControllerShortcut.buttonsCache[gamepadIndex][GamepadKey.START]
+                && ControllerShortcut.buttonsCache[gamepadIndex][GamepadKey.SELECT];
+            if (!comboWasPressed) {
+                window.setTimeout(() => ShortcutHandler.runAction(ShortcutAction.BETTER_XCLOUD_SETTINGS_SHOW), 0);
+            }
+
+            return true;
+        }
+
         const actions = controllerSettings.shortcuts;
         if (!actions) {
             return false;
         }
-
-        const gamepadIndex = gamepad.index;
-
-        // Move the buttons status from the previous frame to the cache
-        ControllerShortcut.buttonsCache[gamepadIndex] = ControllerShortcut.buttonsStatus[gamepadIndex].slice(0);
-        // Clear the buttons status
-        ControllerShortcut.buttonsStatus[gamepadIndex] = [];
 
         const pressed: boolean[] = [];
         let otherButtonPressed = false;

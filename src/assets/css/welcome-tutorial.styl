@@ -1,0 +1,163 @@
+.bx-welcome-tutorial-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(0, 0, 0, .42);
+    pointer-events: none;
+    animation: bx-welcome-tutorial-fade-in 180ms ease-out both;
+}
+
+.bx-welcome-tutorial {
+    position: fixed;
+    z-index: 10060;
+    top: 50%;
+    left: 50%;
+    width: 430px;
+    max-width: unquote('calc(100vw - 36px)');
+    pointer-events: auto;
+    transform: translate(-50%, -50%);
+    transition: top 360ms cubic-bezier(.18, .8, .22, 1), left 360ms cubic-bezier(.18, .8, .22, 1), bottom 360ms cubic-bezier(.18, .8, .22, 1), transform 360ms cubic-bezier(.18, .8, .22, 1);
+    animation: bx-welcome-tutorial-fade-in 180ms ease-out both;
+}
+
+.bx-welcome-tutorial.bx-welcome-tutorial-at-corner {
+    top: auto;
+    bottom: 28px;
+    left: 28px;
+    transform: translate(0, 0);
+}
+
+body.bx-welcome-tutorial-active {
+    .bx-navigation-dialog {
+        z-index: 10055;
+        pointer-events: none;
+    }
+
+    .bx-navigation-dialog-overlay {
+        z-index: 10054;
+        // The tutorial backdrop already darkens the page. Keep this layer
+        // light so the two overlays together stay softly dimmed.
+        background: rgba(11, 11, 11, .12);
+    }
+}
+
+.bx-welcome-tutorial-card {
+    width: min(430px, 100%);
+    padding: 24px;
+    border: 1px solid rgba(98, 232, 120, .55);
+    border-radius: 10px;
+    background: linear-gradient(145deg, #1f2523, #121513 72%);
+    box-shadow: 0 20px 60px #000c;
+    color: #fff;
+    font-family: var(--bx-normal-font);
+    animation: bx-welcome-tutorial-card-in 230ms cubic-bezier(.18, .8, .22, 1) both;
+
+    h2 {
+        margin: 7px 0 10px;
+        font-family: var(--bx-title-font);
+        font-size: 25px;
+    }
+
+    p {
+        min-height: 50px;
+        margin: 0;
+        color: #d0d4d1;
+        font-size: 15px;
+        line-height: 1.45;
+    }
+}
+
+.bx-welcome-tutorial-kicker {
+    color: #72ed8c;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1.4px;
+}
+
+.bx-welcome-tutorial-progress {
+    display: flex;
+    gap: 6px;
+    margin: 22px 0;
+
+    i {
+        width: 100%;
+        height: 4px;
+        border-radius: 99px;
+        background: #505553;
+
+        &[data-active=true], &[data-complete=true] {
+            background: #00a850;
+        }
+    }
+}
+
+.bx-welcome-tutorial-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+
+    .bx-button {
+        min-height: 40px;
+        text-transform: none;
+    }
+}
+
+.bx-welcome-tutorial-closing {
+    animation: bx-welcome-tutorial-fade-out 160ms ease-in both;
+}
+
+.bx-tutorial-highlight {
+    position: relative;
+    z-index: 2;
+    outline: 2px solid #62e878 !important;
+    outline-offset: 3px;
+    border-radius: 5px;
+    box-shadow: 0 0 0 5px rgba(19, 203, 92, .2), 0 0 24px rgba(40, 216, 102, .55);
+    animation: bx-tutorial-highlight-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes bx-tutorial-highlight-pulse {
+    50% { box-shadow: 0 0 0 8px rgba(19, 203, 92, .1), 0 0 30px rgba(40, 216, 102, .7); }
+}
+
+@keyframes bx-welcome-tutorial-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes bx-welcome-tutorial-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes bx-welcome-tutorial-card-in {
+    from { opacity: 0; transform: translateY(18px) scale(.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 460px) {
+    .bx-welcome-tutorial {
+        left: 50%;
+        top: 50%;
+        bottom: auto;
+        width: unquote('calc(100vw - 36px)');
+    }
+
+    .bx-welcome-tutorial.bx-welcome-tutorial-at-corner {
+        top: auto;
+        bottom: 18px;
+        left: 18px;
+    }
+
+    .bx-welcome-tutorial-card {
+        padding: 20px;
+
+        h2 { font-size: 22px; }
+    }
+
+    .bx-welcome-tutorial-actions {
+        flex-direction: column-reverse;
+
+        .bx-button { width: 100%; }
+    }
+}

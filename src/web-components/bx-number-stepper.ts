@@ -202,6 +202,11 @@ export class BxNumberStepper extends HTMLInputElement implements BxHtmlSettingEl
         value = Math.max(this.controlMin, value);
         value = Math.min(this.controlMax, value);
 
+        if (this.options.normalizeValue) {
+            value = this.options.normalizeValue(value, this.controlMin, this.controlMax);
+            value = Math.max(this.controlMin, Math.min(this.controlMax, value));
+        }
+
         return value;
     }
 
@@ -302,7 +307,9 @@ export class BxNumberStepper extends HTMLInputElement implements BxHtmlSettingEl
         let value = this.controlValue;
         value = this.options.reverse ? -value : value;
 
-        if (direction === 'dec') {
+        if (direction === 'dec' && this.controlValue === this.controlMax && typeof this.options.valueBeforeMaximum === 'number') {
+            value = this.options.reverse ? -this.options.valueBeforeMaximum : this.options.valueBeforeMaximum;
+        } else if (direction === 'dec') {
             value = Math.max(this.uiMin, value - this.steps);
         } else {
             value = Math.min(this.uiMax, value + this.steps);

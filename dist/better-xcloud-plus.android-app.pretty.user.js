@@ -41,7 +41,7 @@ if (!BX_FLAGS.DeviceInfo.userAgent) BX_FLAGS.DeviceInfo.userAgent = window.navig
 BxLogger.info("BxFlags", BX_FLAGS);
 var NATIVE_FETCH = window.fetch;
 var BuildConfig = {
- TARGET: "all"
+ TARGET: "android-app"
 }, isAndroidAppBuild = () => BuildConfig.TARGET === "android-app";
 var ALL_PREFS = {
  global: [

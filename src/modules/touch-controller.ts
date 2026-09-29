@@ -4,7 +4,7 @@ import { BxEvent } from "@utils/bx-event";
 import { NATIVE_FETCH } from "@utils/bx-flags";
 import { t } from "@utils/translation";
 import { BxLogger } from "@utils/bx-logger";
-import { GlobalPref } from "@/enums/pref-keys";
+import { GlobalPref, StorageKey } from "@/enums/pref-keys";
 import { getGlobalPref } from "@/utils/pref-utils";
 import { TouchControllerStyleCustom, TouchControllerStyleStandard } from "@/enums/pref-values";
 import { GhPagesUtils } from "@/utils/gh-pages";
@@ -23,6 +23,45 @@ type TouchControlDefinition = {
     product_id: string,
     default_layout: string,
     layouts: Record<string, TouchControlLayout>,
+};
+
+type PersonalTouchLayouts = Record<string, Record<string, TouchControlLayout>>;
+
+// This is deliberately independent from the community layouts.  It gives every
+// touch-enabled title a complete starting point that the player can save and
+// customize, including titles without a curated layout in gh-pages.
+const GENERIC_PERSONAL_LAYOUT: TouchControlLayout = {
+    name: 'Layout pessoal',
+    author: '',
+    content: {
+        left: {
+            inner: [{
+                type: 'joystick',
+                axis: { input: 'axisXY', output: 'leftJoystick' },
+            }],
+            outer: [[
+                { type: 'button', action: 'leftTrigger' },
+                { type: 'button', action: 'leftBumper' },
+            ]],
+        },
+        right: {
+            inner: [{
+                type: 'joystick',
+                axis: { input: 'axisXY', output: 'rightJoystick' },
+            }],
+            outer: [
+                [{ type: 'button', action: 'rightTrigger' }, { type: 'button', action: 'rightBumper' }],
+                { type: 'button', action: 'gamepadY' },
+                { type: 'button', action: 'gamepadX' },
+                { type: 'button', action: 'gamepadB' },
+                { type: 'button', action: 'gamepadA' },
+            ],
+        },
+        upper: {
+            left: [{ type: 'button', action: 'view' }],
+            right: [{ type: 'button', action: 'menu' }],
+        },
+    },
 };
 
 export class TouchController {
@@ -55,6 +94,33 @@ export class TouchController {
 
     static #xboxTitleId: string | null = null;
 
+    static #getPersonalLayouts(): PersonalTouchLayouts {
+        try {
+            const layouts = JSON.parse(window.localStorage.getItem(StorageKey.PERSONAL_TOUCH_LAYOUTS) || '{}');
+            return layouts && typeof layouts === 'object' ? layouts : {};
+        } catch {
+            return {};
+        }
+    }
+
+    static #savePersonalLayouts(layouts: PersonalTouchLayouts) {
+        window.localStorage.setItem(StorageKey.PERSONAL_TOUCH_LAYOUTS, JSON.stringify(layouts));
+    }
+
+    static #mergePersonalLayouts(definition: TouchControlDefinition | null) {
+        const titleId = TouchController.#xboxTitleId;
+        if (!definition || !titleId) {
+            return definition;
+        }
+
+        const personal = TouchController.#getPersonalLayouts()[titleId];
+        if (personal) {
+            Object.assign(definition.layouts, personal);
+        }
+
+        return definition;
+    }
+
     static setXboxTitleId(xboxTitleId: string) {
         TouchController.#xboxTitleId = xboxTitleId;
     }
@@ -66,6 +132,90 @@ export class TouchController {
         }
 
         return TouchController.#customLayouts[xboxTitleId];
+    }
+
+    static getCurrentLayoutId() {
+        return TouchController.#currentLayoutId;
+    }
+
+    /** Saves a private, editable copy of a layout for the game currently open. */
+    static createPersonalLayout(layoutId: string): string | null {
+        const titleId = TouchController.#xboxTitleId;
+        let definition = TouchController.getCustomLayouts();
+        if (!titleId) {
+            return null;
+        }
+
+        // A community layout is optional.  Start from a usable standard layout
+        // when the current game does not have one, so the editor is never
+        // blocked simply because the game is missing from that list.
+        if (!definition) {
+            definition = {
+                name: 'Layout pessoal',
+                product_id: titleId,
+                default_layout: 'bx-personal',
+                layouts: {},
+            };
+            TouchController.#customLayouts[titleId] = definition;
+        }
+
+        const source = definition.layouts[layoutId || definition.default_layout] || GENERIC_PERSONAL_LAYOUT;
+
+        const personalLayouts = TouchController.#getPersonalLayouts();
+        const layoutsForGame = personalLayouts[titleId] ||= {};
+        const id = 'bx-personal';
+        const copy = JSON.parse(JSON.stringify(source)) as TouchControlLayout;
+        copy.name = `${source.name || 'Layout'} (Pessoal)`;
+        copy.author = '';
+        layoutsForGame[id] = copy;
+        TouchController.#savePersonalLayouts(personalLayouts);
+        definition.layouts[id] = copy;
+        return id;
+    }
+
+    /** Updates the personal layout from JSON entered by the user. */
+    static updatePersonalLayout(layoutId: string, text: string): boolean {
+        const titleId = TouchController.#xboxTitleId;
+        const definition = TouchController.getCustomLayouts();
+        if (!titleId || !definition || !layoutId.startsWith('bx-personal')) {
+            return false;
+        }
+
+        try {
+            const layout = JSON.parse(text) as TouchControlLayout;
+            if (!layout || typeof layout !== 'object' || !layout.content || typeof layout.content !== 'object') {
+                throw new Error('Invalid layout');
+            }
+
+            layout.name = typeof layout.name === 'string' && layout.name.trim() ? layout.name.trim() : 'Layout pessoal';
+            layout.author = typeof layout.author === 'string' ? layout.author : '';
+
+            const personalLayouts = TouchController.#getPersonalLayouts();
+            (personalLayouts[titleId] ||= {})[layoutId] = layout;
+            TouchController.#savePersonalLayouts(personalLayouts);
+            definition.layouts[layoutId] = layout;
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    static removePersonalLayout(layoutId: string): boolean {
+        const titleId = TouchController.#xboxTitleId;
+        if (!titleId || !layoutId.startsWith('bx-personal')) {
+            return false;
+        }
+
+        const personalLayouts = TouchController.#getPersonalLayouts();
+        if (!personalLayouts[titleId]?.[layoutId]) {
+            return false;
+        }
+
+        delete personalLayouts[titleId][layoutId];
+        Object.keys(personalLayouts[titleId]).length || delete personalLayouts[titleId];
+        TouchController.#savePersonalLayouts(personalLayouts);
+        delete TouchController.#customLayouts[titleId]?.layouts[layoutId];
+        return true;
     }
 
     static enable() {
@@ -153,9 +303,9 @@ export class TouchController {
             const resp = await NATIVE_FETCH(GhPagesUtils.getUrl(`touch-layouts/${xboxTitleId}.json`));
             const json = await resp.json();
 
-            const layouts = {};
+            const layouts: Record<string, TouchControlLayout> = {};
 
-            json.layouts.forEach(async (layoutName: string) => {
+            await Promise.all(json.layouts.map(async (layoutName: string) => {
                 let baseLayouts = {};
                 if (layoutName in TouchController.#baseCustomLayouts) {
                     baseLayouts = TouchController.#baseCustomLayouts[layoutName];
@@ -171,10 +321,10 @@ export class TouchController {
                 }
 
                 Object.assign(layouts, baseLayouts);
-            });
+            }));
 
             json.layouts = layouts;
-            TouchController.#customLayouts[xboxTitleId] = json;
+            TouchController.#customLayouts[xboxTitleId] = TouchController.#mergePersonalLayouts(json);
 
             // Wait for BX_EXPOSED.touchLayoutManager
             window.setTimeout(() => TouchController.#dispatchLayouts(json), 1000);

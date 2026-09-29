@@ -82,6 +82,7 @@ type HTMLElementTagNameMap = {
     div: HTMLDivElement;
     fieldset: HTMLFieldSetElement;
     input: HTMLInputElement;
+    img: HTMLImageElement;
     label: HTMLLabelElement;
     link: HTMLLinkElement;
     optgroup: HTMLOptGroupElement;

@@ -14,6 +14,7 @@ import { BxEventBus } from "@/utils/bx-event-bus";
 import { BlockFeature } from "@/enums/pref-values";
 import { Toast } from "@/utils/toast";
 import { BxEvent } from "@/utils/bx-event";
+import { isAndroidAppBuild } from "@/build-config";
 
 // Saved while the module loads, before the Remote Play compatibility patch
 // replaces the Fullscreen API.
@@ -41,6 +42,8 @@ export class HeaderSection {
     private $localeButton: HTMLElement | null = null;
     private headerRestoreTimers: number[] = [];
     private headerRestoreInterval: number | null = null;
+    private headerObserver?: MutationObserver;
+    private headerCheckQueued = false;
 
     constructor() {
         BxLogger.info(this.LOG_TAG, 'constructor()');
@@ -67,7 +70,7 @@ export class HeaderSection {
         this.$btnFullscreen = createButton({
             classes: ['bx-hub-fullscreen-button'],
             icon: BxIcon.DISPLAY,
-            title: 'Tela cheia',
+            title: t('fullscreen'),
             style: ButtonStyle.FROSTED | ButtonStyle.DROP_SHADOW | ButtonStyle.FOCUSABLE | ButtonStyle.NORMAL_CASE,
             onClick: this.onFullscreenClick,
         });
@@ -83,13 +86,30 @@ export class HeaderSection {
             !getGlobalPref(GlobalPref.BLOCK_FEATURES).includes(BlockFeature.REMOTE_PLAY) ? this.$btnRemotePlay : null,
             this.$btnSettings,
         );
+        this.observeHeaderReplacement();
 
         BxEventBus.Script.on('xcloud.server', ({status}) => {
             if (status === 'ready') {
                 STATES.isSignedIn = true;
 
-                // Show server name
-                $btnSettings.querySelector('span')!.textContent = getPreferredServerRegion(true) || t('better-xcloud');
+                // Desktop uses a real flag image because Windows can render
+                // country emoji as letters. Keep Android's previous text-only
+                // header button unchanged.
+                const regionName = getPreferredServerRegion();
+                const region = regionName ? STATES.serverRegions[regionName] : undefined;
+                const $serverLabel = $btnSettings.querySelector('span')!;
+                const serverName = (isAndroidAppBuild ? '' : region?.shortName.replace(region.flag || '', '').trim())
+                    || getPreferredServerRegion(true)
+                    || t('better-xcloud');
+
+                $serverLabel.replaceChildren(
+                    !isAndroidAppBuild && region?.flagCode ? CE('img', {
+                        class: 'bx-server-menu-flag',
+                        src: `https://flagcdn.com/w40/${region.flagCode}.png`,
+                        alt: '',
+                    }) : '',
+                    document.createTextNode(serverName),
+                );
             } else if (status === 'error') {
                 Toast.show(t('server-list-error'), '❌', { instant: true });
             } else if (status === 'unavailable') {
@@ -111,6 +131,15 @@ export class HeaderSection {
         if (!$header) {
             return;
         }
+
+        // Xbox can render the market button outside the hub layout (for
+        // example the compact "BR BRS" button). Decorate it here instead of
+        // only while positioning the fullscreen button below.
+        $header.querySelectorAll<HTMLElement>('button').forEach($button => {
+            if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || '')) {
+                this.addLocaleFlag($button);
+            }
+        });
 
         let $target = $header.querySelector<HTMLElement>('div[class*=EdgewaterHeader-module__rightSectionSpacing], div[class*=RemotePlayHeader-module__rightSectionSpacing]');
         if (!$target) {
@@ -163,12 +192,47 @@ export class HeaderSection {
         }, 250);
     }
 
+    /**
+     * Stream exit can rebuild the hub header after its state event has already
+     * fired. Watch for that replacement instead of relying solely on timed
+     * retries, so the Better xCloud menu returns without a page refresh.
+     */
+    private observeHeaderReplacement() {
+        if (this.headerObserver) return;
+
+        this.headerObserver = new MutationObserver(() => {
+            const $header = document.querySelector<HTMLElement>('#gamepass-root header[class^=Header-module__header]');
+            if (!$header) {
+                return;
+            }
+
+            // React may re-render the market button while keeping our own
+            // controls intact. Restore its flag on every header mutation.
+            !isAndroidAppBuild && $header.querySelectorAll<HTMLElement>('button').forEach($button => {
+                if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || '')) {
+                    this.addLocaleFlag($button);
+                }
+            });
+
+            if ($header.contains(this.$buttonsWrapper) || this.headerCheckQueued) {
+                return;
+            }
+
+            this.headerCheckQueued = true;
+            window.setTimeout(() => {
+                this.headerCheckQueued = false;
+                this.checkHeader();
+            }, 0);
+        });
+        this.headerObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
     private isHubPage = () => /^\/[a-zA-Z]{2}-[a-zA-Z]{2}\/play\/?$/.test(window.location.pathname);
 
     private syncFullscreenButton = () => {
         const isFullscreen = nativeFullscreenElementGetter?.call(document) === document.documentElement;
-        this.$btnFullscreen.title = 'Tela cheia';
-        this.$btnFullscreen.setAttribute('aria-label', 'Tela cheia');
+        this.$btnFullscreen.title = t('fullscreen');
+        this.$btnFullscreen.setAttribute('aria-label', t('fullscreen'));
         this.$btnFullscreen.classList.toggle('bx-hub-fullscreen-active', isFullscreen);
     }
 
@@ -209,6 +273,7 @@ export class HeaderSection {
         );
 
         if ($localeButton?.parentElement) {
+            this.addLocaleFlag($localeButton);
             $localeButton.parentElement.insertBefore(this.$btnFullscreen, $localeButton);
             this.$localeButton = $localeButton;
         } else {
@@ -228,6 +293,21 @@ export class HeaderSection {
         })?.classList.add('bx-hide-in-browser-fullscreen');
 
         this.syncFullscreenButton();
+    }
+
+    /** Add a real flag image to Xbox's own market button (for example BR BRS).
+     * Emoji flags become plain letters in some Windows font installations. */
+    private addLocaleFlag($button: HTMLElement) {
+        const countryCode = $button.textContent?.trim().match(/^([a-z]{2})\s/i)?.[1]?.toLowerCase();
+        if (!countryCode || $button.querySelector('.bx-locale-flag')) {
+            return;
+        }
+
+        $button.prepend(CE('img', {
+            class: 'bx-locale-flag',
+            src: `https://flagcdn.com/w40/${countryCode}.png`,
+            alt: '',
+        }));
     }
 
     showRemotePlayButton() {

@@ -15,7 +15,7 @@ export class WebGL2Player extends BaseCanvasPlayer {
     private historyTexture: WebGLTexture | null = null;
     private copyFramebuffer: WebGLFramebuffer | null = null;
     private hasPreviousFrame = false;
-    private generatedFrameIds: number[] = [];
+    private generatedFrameIds: Array<{ id: number, timer: boolean }> = [];
     private lastSourceFrameAt = 0;
     private estimatedSourceFps = 60;
     private renderedFrameTimes: number[] = [];
@@ -184,23 +184,52 @@ export class WebGL2Player extends BaseCanvasPlayer {
         const sourceFps = this.targetFps > 0 && this.targetFps < 60
             ? this.targetFps
             : this.estimatedSourceFps;
-        const baseFrameInterval = 1000 / Math.max(1, sourceFps);
-        const presentationInterval = baseFrameInterval ? baseFrameInterval / multiplier : 0;
+        // "Personalizado" is an output-FPS target, not merely another name
+        // for a multiplier.  Previously 45, 50 and 60 FPS could all choose
+        // 2× from a 30 FPS stream and were then scheduled at 60 FPS anyway.
+        // Keep fixed 2×/3×/4× modes multiplier-based, while using the custom
+        // target to calculate the presentation cadence.
+        const requestedOutputFps = this.options.vxFrameGeneration === VxFrameGenerationMode.CUSTOM
+            ? this.options.vxFrameTargetFps
+            : sourceFps * multiplier;
+        const presentationInterval = 1000 / Math.max(1, requestedOutputFps);
         const startedAt = performance.now();
 
         // Canvas updates are only visible on a compositor refresh. Align each
         // generated image to requestAnimationFrame instead of issuing a burst
         // of WebGL draws between two screen refreshes.
         const scheduleAt = (targetAt: number, callback: () => void) => {
+            // requestAnimationFrame is intentionally capped by the display
+            // refresh rate. Every enabled VX generation mode must be able to
+            // process its full multiplier internally (2×/3×/4× included),
+            // even if a 60 Hz panel cannot present all those frames. Timers
+            // keep the generator and R counter independent from that cap.
+            if (this.options.vxFrameGeneration !== VxFrameGenerationMode.OFF) {
+                const delay = Math.max(0, targetAt - performance.now());
+                const id = window.setTimeout(() => {
+                    if (!this.isStopped) callback();
+                }, delay);
+                this.generatedFrameIds.push({ id, timer: true });
+                return;
+            }
+
             const waitForPresentation = () => {
                 if (this.isStopped) return;
-                if (performance.now() + 0.5 >= targetAt) {
+                // rAF is quantized to the display refresh. On a 60 Hz panel
+                // its callback often arrives ~0.5–3 ms before a nominal
+                // 16.67 ms target. Waiting for the following callback loses
+                // a complete refresh (and it is usually cancelled by the
+                // next 30 FPS source frame), producing the observed 47–50
+                // FPS instead of a stable 60. Present on that refresh when
+                // it is within a small fraction of the desired interval.
+                const earlyPresentationTolerance = Math.min(4, Math.max(1, presentationInterval * 0.25));
+                if (performance.now() + earlyPresentationTolerance >= targetAt) {
                     callback();
                     return;
                 }
-                this.generatedFrameIds.push(requestAnimationFrame(waitForPresentation));
+                this.generatedFrameIds.push({ id: requestAnimationFrame(waitForPresentation), timer: false });
             };
-            this.generatedFrameIds.push(requestAnimationFrame(waitForPresentation));
+            this.generatedFrameIds.push({ id: requestAnimationFrame(waitForPresentation), timer: false });
         };
 
         const presentNext = () => {
@@ -218,7 +247,7 @@ export class WebGL2Player extends BaseCanvasPlayer {
     }
 
     private cancelGeneratedFrames() {
-        this.generatedFrameIds.forEach(id => cancelAnimationFrame(id));
+        this.generatedFrameIds.forEach(({ id, timer }) => timer ? clearTimeout(id) : cancelAnimationFrame(id));
         this.generatedFrameIds = [];
     }
 

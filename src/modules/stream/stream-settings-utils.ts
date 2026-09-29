@@ -159,6 +159,14 @@ export function updateVideoPlayer() {
         return;
     }
 
+    let frameGeneration = getStreamPref(StreamPref.VX_FRAME_GENERATION);
+    // The experimental automatic mode was removed. Normalize an old saved
+    // value so it cannot leave the select box without a valid option.
+    if (frameGeneration === VxFrameGenerationMode.AUTO) {
+        frameGeneration = VxFrameGenerationMode.OFF;
+        setStreamPref(StreamPref.VX_FRAME_GENERATION, frameGeneration, 'direct');
+    }
+
     let options = {
         processing: getStreamPref(StreamPref.VIDEO_PROCESSING),
         processingMode: getStreamPref(StreamPref.VIDEO_PROCESSING_MODE),
@@ -170,7 +178,7 @@ export function updateVideoPlayer() {
         vxUpscaleAlgorithm: getStreamPref(StreamPref.VX_UPSCALE_ALGORITHM),
         vxAntiAliasing: getStreamPref(StreamPref.VX_ANTI_ALIASING),
         vxArtifactReduction: getStreamPref(StreamPref.VX_ARTIFACT_REDUCTION),
-        vxFrameGeneration: getStreamPref(StreamPref.VX_FRAME_GENERATION),
+        vxFrameGeneration: frameGeneration,
         vxLatencyBudget: getStreamPref(StreamPref.VX_LATENCY_BUDGET),
         vxAdaptiveSharpen: getStreamPref(StreamPref.VX_ADAPTIVE_SHARPEN),
         vxDynamicReconstruction: getStreamPref(StreamPref.VX_DYNAMIC_RECONSTRUCTION),

@@ -208,7 +208,7 @@ export class StreamUiHandler {
             }
 
             const isFullscreen = nativeFullscreenElementGetter?.call(document) === document.documentElement;
-            const label = isFullscreen ? 'Sair da tela cheia' : 'Tela cheia';
+            const label = isFullscreen ? t('exit-fullscreen') : t('fullscreen');
             $button.classList.toggle('bx-stream-menu-button-on', isFullscreen);
             $button.querySelector('button')?.setAttribute('title', label);
             $button.querySelector('button')?.setAttribute('aria-label', label);
@@ -216,7 +216,7 @@ export class StreamUiHandler {
 
         let $btnStreamFullscreen = StreamUiHandler.$btnStreamFullscreen;
         if (typeof $btnStreamFullscreen === 'undefined') {
-            $btnStreamFullscreen = StreamUiHandler.cloneStreamHudButton($orgButton, 'Tela cheia', BxIcon.DISPLAY);
+            $btnStreamFullscreen = StreamUiHandler.cloneStreamHudButton($orgButton, t('fullscreen'), BxIcon.DISPLAY);
             $btnStreamFullscreen?.addEventListener('click', async e => {
                 e.preventDefault();
                 e.stopPropagation();

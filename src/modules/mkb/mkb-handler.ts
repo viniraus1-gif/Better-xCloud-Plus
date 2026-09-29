@@ -134,7 +134,7 @@ export class EmulatedMkbHandler extends MkbHandler {
     private static readonly LOG_TAG = 'EmulatedMkbHandler';
 
     static isAllowed() {
-        return getGlobalPref(GlobalPref.MKB_ENABLED) && (AppInterface || !UserAgent.isMobile());
+        return getGlobalPref(GlobalPref.MKB_ENABLED) && !UserAgent.isMobileDevice();
     }
 
     private PRESET!: MkbConvertedPresetData | null;

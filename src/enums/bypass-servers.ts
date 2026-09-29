@@ -1,11 +1,11 @@
 import { t } from "@/utils/translation"
 
 export const BypassServers = {
-    br: t('brazil'),
-    jp: t('japan'),
-    kr: t('korea'),
-    pl: t('poland'),
-    us: t('united-states'),
+    br: '🇧🇷 ' + t('brazil'),
+    jp: '🇯🇵 ' + t('japan'),
+    kr: '🇰🇷 ' + t('korea'),
+    pl: '🇵🇱 ' + t('poland'),
+    us: '🇺🇸 ' + t('united-states'),
 } as const;
 
 export const BypassServerIps: Record<keyof typeof BypassServers, string> = {

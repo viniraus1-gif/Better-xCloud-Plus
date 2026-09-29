@@ -18,6 +18,10 @@ type ServerRegion = {
     isDefault: boolean;
     name: string;
     shortName: string;
+    /** Country flag used by the desktop custom region selector. */
+    flag?: string;
+    /** ISO country code used for the desktop flag image. */
+    flagCode?: string;
     displayName: string;
 
     contintent: ServerContinent;

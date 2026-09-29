@@ -24,6 +24,8 @@ interface BaseSettingDefinition {
     labelIcon?: BxIconRaw,
     note?: string | (() => HTMLElement) | HTMLElement;
     experimental?: boolean;
+    /** Feature depends on desktop-only input or browser APIs. */
+    desktopOnly?: boolean;
     unsupported?: boolean;
     unsupportedValue?: SettingDefinition['default'];
     unsupportedNote?: string | (() => HTMLElement);
@@ -85,6 +87,12 @@ type NumberStepperParams = Partial<{
     exactTicks: number;
 
     customTextValue: (value: any, min?: number, max?: number) => string | null;
+    /** Snap a range value to a meaningful control value (for sentinel values
+     * such as an Unlimited position at the end of a slider). */
+    normalizeValue: (value: number, min: number, max: number) => number;
+    /** Value selected by the − button when the control is at its final
+     * sentinel position. */
+    valueBeforeMaximum: number;
     reverse: boolean;
 }>
 

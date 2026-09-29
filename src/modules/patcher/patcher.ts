@@ -116,6 +116,20 @@ const PATCHES = {
         return str;
     },
 
+    /** Keep a cloud stream alive only when xCloud sends its idle warning. */
+    cloudStreamKeepAlive(str: string) {
+        const text = 'onServerDisconnectMessage(e){';
+        if (!str.includes(text)) {
+            return false;
+        }
+
+        const cloudKeepAliveCode = codeRemotePlayKeepAlive.replace(
+            "window.location.pathname.includes('/play/consoles/launch/')",
+            "window.location.pathname.includes('/play/launch/')",
+        );
+        return str.replace(text, text + cloudKeepAliveCode);
+    },
+
     // Remote Play: Disable achievement toast
     remotePlayDisableAchievementToast(str: string) {
         let text = '.AchievementUnlock:{';
@@ -1343,8 +1357,6 @@ let PATCH_ORDERS = PatcherUtils.filterPatches([
 
     'broadcastPollingMode',
 
-    getGlobalPref(GlobalPref.UI_GAME_CARD_SHOW_WAIT_TIME) && 'patchSetCurrentFocus',
-
     'patchGamepadPolling',
 
     'modifyPreloadedState',
@@ -1453,6 +1465,7 @@ let STREAM_PAGE_PATCH_ORDERS = PatcherUtils.filterPatches([
 
     'injectStreamMenuUseEffect',
     'disablePauseOnWindowBlur',
+    getGlobalPref(GlobalPref.STREAM_CLOUD_KEEP_ALIVE) && 'cloudStreamKeepAlive',
 
     getGlobalPref(GlobalPref.STREAM_PREVENT_RESOLUTION_DROPS) && 'patchStreamMetadata',
 

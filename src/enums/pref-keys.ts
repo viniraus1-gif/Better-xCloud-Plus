@@ -1,5 +1,5 @@
 import type { BaseSettingsStorage } from "@/utils/settings-storages/base-settings-storage";
-import type { BlockFeature, CodecProfile, DeviceVibrationMode, GameBarPosition, LoadingScreenRocket, NativeMkbMode, StreamPlayerType, StreamResolution, StreamStat, StreamStatPosition, StreamVideoProcessing, StreamVideoProcessingMode, TouchControllerMode, TouchControllerStyleCustom, TouchControllerStyleStandard, UiLayout, UiSection, UiTheme, VideoPosition, VideoPowerPreference, VideoRatio, VxAntiAliasing, VxFrameGenerationMode, VxUpscaleTarget } from "./pref-values"
+import type { BlockFeature, CodecProfile, DeviceVibrationMode, GameBarPosition, NativeMkbMode, StreamPlayerType, StreamResolution, StreamStat, StreamStatPosition, StreamVideoProcessing, StreamVideoProcessingMode, TouchControllerMode, TouchControllerStyleCustom, TouchControllerStyleStandard, UiLayout, UiSection, UiTheme, VideoPosition, VideoPowerPreference, VideoRatio, VxAntiAliasing, VxFrameGenerationMode, VxUpscaleTarget } from "./pref-values"
 
 export const enum StorageKey {
     GLOBAL = 'BetterXcloud',
@@ -10,9 +10,11 @@ export const enum StorageKey {
     PATCHES_CACHE = 'BetterXcloud.Patches.Cache',
     PATCHES_SIGNATURE = 'BetterXcloud.Patches.Cache.Signature',
     USER_AGENT = 'BetterXcloud.UserAgent',
+    TUTORIAL_DISMISSED = 'BetterXcloud.Tutorial.Dismissed',
 
     GH_PAGES_COMMIT_HASH = 'BetterXcloud.GhPages.CommitHash',
     LIST_CUSTOM_TOUCH_LAYOUTS = 'BetterXcloud.GhPages.CustomTouchLayouts',
+    PERSONAL_TOUCH_LAYOUTS = 'BetterXcloud.TouchLayouts.Personal',
     LIST_FORCE_NATIVE_MKB = 'BetterXcloud.GhPages.ForceNativeMkb',
     LIST_LOCAL_CO_OP = 'BetterXcloud.GhPages.LocalCoOp',
 }
@@ -35,6 +37,7 @@ export const enum GlobalPref {
     STREAM_MAX_VIDEO_BITRATE = 'stream.video.maxBitrate',
     STREAM_COMBINE_SOURCES = 'stream.video.combineAudio',
     STREAM_PREVENT_RESOLUTION_DROPS = 'stream.video.preventResolutionDrops',
+    STREAM_CLOUD_KEEP_ALIVE = 'stream.cloud.keepAlive',
 
     USER_AGENT_PROFILE = 'userAgent.profile',
 
@@ -98,7 +101,7 @@ export type GlobalPrefTypeMap = {
     [GlobalPref.GAME_BAR_POSITION]: GameBarPosition;
     [GlobalPref.GAME_FORTNITE_FORCE_CONSOLE]: boolean;
     [GlobalPref.LOADING_SCREEN_GAME_ART]: boolean;
-    [GlobalPref.LOADING_SCREEN_ROCKET]: LoadingScreenRocket;
+    [GlobalPref.LOADING_SCREEN_ROCKET]: boolean;
     [GlobalPref.LOADING_SCREEN_SHOW_WAIT_TIME]: boolean;
     [GlobalPref.MKB_ENABLED]: boolean;
     [GlobalPref.MKB_HIDE_IDLE_CURSOR]: boolean;
@@ -116,6 +119,7 @@ export type GlobalPrefTypeMap = {
     [GlobalPref.STREAM_PREFERRED_LOCALE]: StreamPreferredLocale;
     [GlobalPref.STREAM_RESOLUTION]: StreamResolution;
     [GlobalPref.STREAM_PREVENT_RESOLUTION_DROPS]: boolean;
+    [GlobalPref.STREAM_CLOUD_KEEP_ALIVE]: boolean;
     [GlobalPref.TOUCH_CONTROLLER_AUTO_OFF]: boolean;
     [GlobalPref.TOUCH_CONTROLLER_DEFAULT_OPACITY]: number;
     [GlobalPref.TOUCH_CONTROLLER_MODE]: TouchControllerMode;
@@ -288,6 +292,7 @@ export const ALL_PREFS: {
         GlobalPref.STREAM_PREFERRED_LOCALE,
         GlobalPref.STREAM_RESOLUTION,
         GlobalPref.STREAM_PREVENT_RESOLUTION_DROPS,
+        GlobalPref.STREAM_CLOUD_KEEP_ALIVE,
         GlobalPref.TOUCH_CONTROLLER_AUTO_OFF,
         GlobalPref.TOUCH_CONTROLLER_DEFAULT_OPACITY,
         GlobalPref.TOUCH_CONTROLLER_MODE,

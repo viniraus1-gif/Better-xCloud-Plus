@@ -29,7 +29,6 @@ import { GuideMenu } from "./modules/ui/guide-menu";
 import { updateVideoPlayer } from "./modules/stream/stream-settings-utils";
 import { BlockFeature, NativeMkbMode, TouchControllerMode, UiSection } from "./enums/pref-values";
 import { HeaderSection } from "./modules/ui/header";
-import { GameTile } from "./modules/ui/game-tile";
 import { HubGameLaunchAnimation } from "./modules/ui/hub-game-launch-animation";
 import { ProductDetailsPage } from "./modules/ui/product-details";
 import { NavigationDialogManager } from "./modules/ui/dialog/navigation-dialog";
@@ -54,8 +53,11 @@ import { VxVideoEngine } from "./modules/vx/vx-video-engine";
 import { StreamPlayerElement } from "./modules/player/base-stream-player";
 import { VxOverlay } from "./modules/vx/vx-overlay";
 import { SettingsDialog } from "./modules/ui/dialog/settings-dialog";
+import { CloudKeepAlive } from "./modules/cloud-keep-alive";
+import { WelcomeTutorial } from "./modules/ui/welcome-tutorial";
 
 SettingsManager.getInstance();
+CloudKeepAlive.initialize();
 
 // Handle login page
 if (window.location.pathname.includes('/auth/msa')) {
@@ -237,8 +239,12 @@ BxEventBus.Stream.on('state.loading', () => {
     }
 });
 
-// Setup loading screen
-getGlobalPref(GlobalPref.LOADING_SCREEN_GAME_ART) && BxEventBus.Script.on('titleInfo.ready', LoadingScreen.setup);
+// The rocket is independent from the optional game artwork.  Previously the
+// loading screen was only initialized when artwork was enabled, so enabling
+// “Restaurar animação do foguete” alone had no visible effect.
+(getGlobalPref(GlobalPref.LOADING_SCREEN_GAME_ART)
+    || getGlobalPref(GlobalPref.LOADING_SCREEN_ROCKET))
+    && BxEventBus.Script.on('titleInfo.ready', LoadingScreen.setup);
 
 BxEventBus.Stream.on('state.starting', () => {
     // Hide loading screen
@@ -455,6 +461,7 @@ function main() {
     // Setup UI
     addCss();
     HubGameLaunchAnimation.setup();
+    WelcomeTutorial.setup();
 
     if (getGlobalPref(GlobalPref.UI_DISABLE_FEEDBACK_DIALOG)) {
         document.addEventListener('bx-feedback-skipped', () => {
@@ -485,9 +492,6 @@ function main() {
             STATES.pointerServerPort = AppInterface.startPointerServer() || 9269;
             BxLogger.info('startPointerServer', 'Port', STATES.pointerServerPort.toString());
         }
-
-        // Show wait time in game card
-        getGlobalPref(GlobalPref.UI_GAME_CARD_SHOW_WAIT_TIME) && GameTile.setup();
 
         EmulatedMkbHandler.setupEvents();
     }

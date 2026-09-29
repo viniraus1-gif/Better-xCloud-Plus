@@ -1,6 +1,7 @@
 import { Toast } from "@/utils/toast";
 import { PointerClient } from "./pointer-client";
 import { AppInterface, STATES } from "@/utils/global";
+import { UserAgent } from "@/utils/user-agent";
 import { MkbHandler } from "./base-mkb-handler";
 import { t } from "@/utils/translation";
 import { BxEvent } from "@/utils/bx-event";
@@ -30,7 +31,9 @@ export class NativeMkbHandler extends MkbHandler {
     private readonly LOG_TAG = 'NativeMkbHandler';
 
     static isAllowed = () => {
-        return STATES.browser.capabilities.emulatedNativeMkb && getGlobalPref(GlobalPref.NATIVE_MKB_MODE) === NativeMkbMode.ON;
+        return !UserAgent.isMobileDevice()
+            && STATES.browser.capabilities.emulatedNativeMkb
+            && getGlobalPref(GlobalPref.NATIVE_MKB_MODE) === NativeMkbMode.ON;
     }
 
     private pointerClient: PointerClient | undefined;

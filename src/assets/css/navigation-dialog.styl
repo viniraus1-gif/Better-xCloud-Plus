@@ -36,7 +36,9 @@
 
 .bx-navigation-dialog-overlay {
     position: fixed;
-    background: #0b0b0be3;
+    // Keep the page visible behind the settings menu without compromising
+    // readability of the panel itself.
+    background: rgba(11, 11, 11, .68);
     top: 0;
     left: 0;
     right: 0;

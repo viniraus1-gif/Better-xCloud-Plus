@@ -83,7 +83,9 @@ public final class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
 
-        injectedScript = wrapScript(readAsset("better-xcloud-plus.user.js"));
+        // This is the Android-only build output. Do not point this at the
+        // desktop userscript: the two targets can now evolve independently.
+        injectedScript = wrapScript(readAsset("better-xcloud-plus.android.user.js"));
         installDocumentStartScript();
         webView.setWebChromeClient(new XboxChromeClient());
         webView.setWebViewClient(new XboxWebViewClient());

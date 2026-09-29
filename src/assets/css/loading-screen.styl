@@ -1,6 +1,9 @@
 .bx-original-rocket-video {
     position: absolute;
-    z-index: 0;
+    // The native hero art is a separate layer in the current Xbox UI.
+    // Keep the restored rocket above it while pointer-events stays disabled
+    // so the queue and guide controls remain usable.
+    z-index: 1;
     inset: 0;
     width: 100%;
     height: 100%;

@@ -5,7 +5,6 @@ import { STATES } from "@utils/global";
 import { GlobalPref } from "@/enums/pref-keys";
 import { getGlobalPref } from "@/utils/pref-utils";
 import { compressCss } from "@macros/build" with { type: "macro" };
-import { LoadingScreenRocket } from "@/enums/pref-values";
 
 export class LoadingScreen {
     // This is the current first-party asset referenced by Xbox's own
@@ -37,9 +36,6 @@ export class LoadingScreen {
         LoadingScreen.rocketRequested = true;
         LoadingScreen.installLoadingGuideFallback();
         const titleInfo = STATES.currentStream.titleInfo;
-        if (!titleInfo) {
-            return;
-        }
 
         if (!LoadingScreen.$bgStyle) {
             const $bgStyle = CE('style');
@@ -47,11 +43,24 @@ export class LoadingScreen {
             LoadingScreen.$bgStyle = $bgStyle;
         }
 
-        if (titleInfo.product) {
+        // Artwork needs title metadata, but the rocket itself does not. Keep
+        // them independent so a delayed/missing titleInfo event cannot hide
+        // an explicitly enabled rocket animation.
+        if (getGlobalPref(GlobalPref.LOADING_SCREEN_GAME_ART) && titleInfo?.product) {
             LoadingScreen.setBackground(titleInfo.product.heroImageUrl || titleInfo.product.titledHeroImageUrl || titleInfo.product.tileImageUrl);
+        } else {
+            // The refreshed Xbox loading screen owns a hero-art backdrop of
+            // its own. Hide it when the user opted out of game artwork;
+            // otherwise it sits in front of the restored rocket video.
+            LoadingScreen.$bgStyle.textContent += compressCss(`
+#game-stream [class*=ConnectingHeroArtBackdrop-module__backdrop],
+#game-stream [class*=ConnectingHeroArtBackdrop] {
+    display: none !important;
+}
+`);
         }
 
-        if (getGlobalPref(GlobalPref.LOADING_SCREEN_ROCKET) === LoadingScreenRocket.HIDE) {
+        if (!getGlobalPref(GlobalPref.LOADING_SCREEN_ROCKET)) {
             LoadingScreen.hideRocket();
         } else {
             LoadingScreen.showOriginalRocket();
@@ -90,7 +99,15 @@ export class LoadingScreen {
      */
     private static showOriginalRocket(retry = 0) {
         const mount = document.querySelector<HTMLElement>('#game-stream');
-        if (!LoadingScreen.rocketRequested || LoadingScreen.$rocketVideo?.isConnected) {
+        if (!LoadingScreen.rocketRequested) {
+            return;
+        }
+
+        // A page reload can preserve a mounted video for a short time while
+        // xCloud rebuilds its loading tree. Do not assume that a connected
+        // video is playing: resume it if it was paused on its first frame.
+        if (LoadingScreen.$rocketVideo?.isConnected) {
+            LoadingScreen.ensureRocketPlayback(LoadingScreen.$rocketVideo);
             return;
         }
 
@@ -98,10 +115,10 @@ export class LoadingScreen {
         // frames after titleInfo.ready. Retry briefly instead of silently
         // giving up, but never resurrect the animation after loading ends.
         const $screens = mount?.querySelector<HTMLElement>('[class*=PureScreens-module__screens]');
-        const $heroArt = $screens?.querySelector<HTMLElement>('[class*=ConnectingHeroArtBackdrop-module__backdrop]');
+        const $heroArt = $screens?.querySelector<HTMLElement>('[class*=ConnectingHeroArtBackdrop-module__backdrop], [class*=ConnectingHeroArtBackdrop]');
         const needsHeroArt = getGlobalPref(GlobalPref.LOADING_SCREEN_GAME_ART);
 
-        if (!mount || (needsHeroArt && (!$screens || !$heroArt))) {
+        if (!mount || (needsHeroArt && (!$screens || !$heroArt) && retry < 12)) {
             if (retry < 12) {
                 window.setTimeout(() => LoadingScreen.showOriginalRocket(retry + 1), 100);
             }
@@ -117,20 +134,51 @@ export class LoadingScreen {
             preload: 'auto',
             'aria-hidden': 'true',
         }) as HTMLVideoElement;
+        // Set the properties as well as the HTML attributes before playback.
+        // Some Chromium builds only grant muted autoplay when muted is a
+        // property at the time play() is requested.
+        $video.muted = true;
+        $video.defaultMuted = true;
         $video.src = LoadingScreen.ROCKET_VIDEO_URL;
-        $video.play().catch(() => {
-            // Autoplay policies may defer playback until the page receives a
-            // user gesture. The native loading flow must continue regardless.
-        });
         // On the new page, hero art and queue controls are siblings. Insert
         // the rocket between them: it overlays only the art while the native
         // controls and guide stay above it and keep their focus behavior.
         if ($heroArt) {
             $heroArt.insertAdjacentElement('afterend', $video);
+        } else if ($screens) {
+            // Xbox occasionally renames/removes the hero-art wrapper. The
+            // screen root is still the correct loading-screen mount point.
+            $screens.prepend($video);
         } else {
             mount.prepend($video);
         }
         LoadingScreen.$rocketVideo = $video;
+        // Calling play before the element is connected can leave the video
+        // frozen after a refresh during connection. Mount first, then retry
+        // once media data becomes available.
+        $video.addEventListener('loadeddata', () => LoadingScreen.ensureRocketPlayback($video), { once: true });
+        $video.addEventListener('canplay', () => LoadingScreen.ensureRocketPlayback($video), { once: true });
+        LoadingScreen.ensureRocketPlayback($video);
+    }
+
+    private static ensureRocketPlayback($video: HTMLVideoElement, retry = 0) {
+        if (!LoadingScreen.rocketRequested || !$video.isConnected) {
+            return;
+        }
+
+        $video.muted = true;
+        const retryPlayback = () => {
+            if (retry < 8) {
+                window.setTimeout(() => LoadingScreen.ensureRocketPlayback($video, retry + 1), 150);
+            }
+        };
+
+        if ($video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            retryPlayback();
+            return;
+        }
+
+        $video.play().catch(retryPlayback);
     }
 
     private static removeOriginalRocket() {
@@ -241,9 +289,6 @@ export class LoadingScreen {
     }
 
     static setupWaitTime(waitTime: number) {
-        if (getGlobalPref(GlobalPref.LOADING_SCREEN_ROCKET) === LoadingScreenRocket.HIDE_QUEUE) {
-            LoadingScreen.hideRocket();
-        }
         LoadingScreen.showLeaveQueueButton();
 
         LoadingScreen.waitTimeInterval && clearInterval(LoadingScreen.waitTimeInterval);

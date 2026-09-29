@@ -190,13 +190,12 @@ export class StreamStats {
             : Math.round(streamFps);
         $element.dataset.vxFrameGeneration = 'true';
         $element.replaceChildren(
-            CE('span', { class: 'bx-vx-fps-source' }, `S ${Math.round(streamFps)}`),
-            CE('span', { class: 'bx-vx-fps-base', title: 'FPS-base enviado para a geração local' }, `B ${baseFps}`),
-            CE('span', { class: 'bx-vx-fps-bar', title: 'Stream → quadros intermediários locais → renderização local' },
+            CE('span', { class: 'bx-vx-fps-base', title: t('vx-fps-base-title') }, `${t('vx-fps-base')} ${baseFps}`),
+            CE('span', { class: 'bx-vx-fps-bar', title: t('vx-fps-render-title') },
                 CE('i', { class: 'bx-vx-fps-stream' }),
                 CE('i', { class: 'bx-vx-fps-generated' }),
             ),
-            CE('span', { class: 'bx-vx-fps-generated-value' }, localRenderFps ? `R ${localRenderFps}` : 'R —'),
+            CE('span', { class: 'bx-vx-fps-generated-value', title: t('vx-fps-render-title') }, localRenderFps ? `${t('vx-fps-render')} ${localRenderFps}` : `${t('vx-fps-render')} —`),
         );
     }
 
@@ -230,7 +229,7 @@ export class StreamStats {
         $element.dataset.vxUpscale = 'true';
         $element.replaceChildren(
             CE('span', { class: 'bx-vx-resolution-source' }, `S ${sourceResolution}`),
-            CE('span', { class: 'bx-vx-resolution-bar', title: 'Stream → upscale espacial VX → saída local' },
+            CE('span', { class: 'bx-vx-resolution-bar', title: t('vx-upscale-pipeline') },
                 CE('i', { class: 'bx-vx-resolution-stream' }),
                 CE('i', { class: 'bx-vx-resolution-output' }),
             ),

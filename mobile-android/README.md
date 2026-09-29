@@ -9,7 +9,16 @@ Wrapper Android em tela cheia para `xbox.com/play`. O app injeta a versão compi
 3. Aguarde a sincronização do Gradle e conecte um celular Android ou abra um emulador.
 4. Use **Run** para testar. Para gerar um APK: **Build → Build APK(s)**.
 
-O arquivo de script em `app/src/main/assets/better-xcloud-plus.user.js` precisa ser atualizado sempre que a versão em `../dist/` mudar.
+O app usa o arquivo exclusivo `app/src/main/assets/better-xcloud-plus.android.user.js`.
+Ele é gerado automaticamente junto com a build Android pelo comando abaixo, sem reutilizar
+o bundle de PC:
+
+```bash
+bun build.ts --version 1.0.0 --variant full --pretty
+```
+
+O bundle do PC continua em `../dist/better-xcloud-plus.pretty.user.js`; o bundle Android
+correspondente fica em `../dist/better-xcloud-plus.android-app.pretty.user.js`.
 
 ## Limites
 

@@ -1,6 +1,6 @@
 import { ButtonStyle, CE, createButton, createSettingRow, renderPresetsList } from "@/utils/html";
 import type { SettingsDialog } from "../settings-dialog";
-import { MkbMappingPresetsTable } from "@/utils/local-db/mkb-mapping-presets-table";
+import { getSuggestedMkbPresetForTitle, MkbMappingPresetsTable } from "@/utils/local-db/mkb-mapping-presets-table";
 import { BxSelectElement } from "@/web-components/bx-select";
 import { t } from "@/utils/translation";
 import { getGlobalPref, getStreamPref, setStreamPref } from "@/utils/pref-utils";
@@ -9,6 +9,7 @@ import { MkbMappingManagerDialog } from "../profile-manger/mkb-mapping-manager-d
 import { KeyboardShortcutsManagerDialog } from "../profile-manger/keyboard-shortcuts-manager-dialog";
 import { KeyboardShortcutsTable } from "@/utils/local-db/keyboard-shortcuts-table";
 import { BxIcon } from "@/utils/bx-icon";
+import { STATES } from "@/utils/global";
 
 export class MkbExtraSettings extends HTMLElement {
     private $mappingPresets!: BxSelectElement;
@@ -39,6 +40,8 @@ export class MkbExtraSettings extends HTMLElement {
             },
         }));
 
+        const suggestedPreset = getSuggestedMkbPresetForTitle(STATES.currentStream.titleInfo?.product.title);
+
         $container.append(
             ...(getGlobalPref(GlobalPref.MKB_ENABLED) ? [
                 createSettingRow(
@@ -65,6 +68,23 @@ export class MkbExtraSettings extends HTMLElement {
                         pref: StreamPref.MKB_P1_MAPPING_PRESET_ID,
                     },
                 ),
+
+                ...(suggestedPreset ? [createSettingRow(
+                    t('suggested-control-profile'),
+                    createButton({
+                        label: `${t('use-suggested-profile')}: ${suggestedPreset.name}`,
+                        icon: BxIcon.NEW,
+                        style: ButtonStyle.FOCUSABLE | ButtonStyle.NORMAL_CASE,
+                        onClick: () => {
+                            $container.$mappingPresets.value = suggestedPreset.id.toString();
+                            $container.saveMkbSettings();
+                        },
+                    }),
+                    {
+                        multiLines: true,
+                        $note: CE('div', { class: 'bx-settings-dialog-note' }, t('suggested-profile-note')),
+                    },
+                )] : []),
 
                 createSettingRow(
                     t('virtual-controller-slot'),

@@ -3,6 +3,7 @@ import type { NavigationElement } from "@/modules/ui/dialog/navigation-dialog";
 import { BxEvent } from "@/utils/bx-event";
 import { setNearby } from "@/utils/navigation-utils";
 import { getGlobalPref } from "@/utils/pref-utils";
+import { isAndroidAppBuild } from "@/build-config";
 import { ButtonStyle, CE, clearDataSet, createButton } from "@utils/html";
 
 export class BxSelectElement extends HTMLSelectElement {
@@ -20,6 +21,8 @@ export class BxSelectElement extends HTMLSelectElement {
     private $checkBox!: HTMLInputElement;
     private $multipleDropdown: HTMLElement | null = null;
     private closeMultipleDropdown!: () => void;
+    private $flagDropdown: HTMLElement | null = null;
+    private closeFlagDropdown!: () => void;
 
     static create($select: HTMLSelectElement, forceFriendly=false, preserveNativeMultiple=false): BxSelectElement {
         const isControllerFriendly = !($select.multiple && preserveNativeMultiple)
@@ -63,6 +66,26 @@ export class BxSelectElement extends HTMLSelectElement {
         self.optionsList = Array.from($select.querySelectorAll<HTMLOptionElement>('option'));
         self.$indicators = CE('div', { class: 'bx-select-indicators' });
         self.indicatorsList = [];
+
+        // Native Windows select menus cannot display images inside <option>.
+        // Server regions carry a country flag, so open a custom menu for them
+        // and keep the native select only as the value/form control.
+        // Android already renders its native server selector correctly with
+        // emoji/text. Keep the desktop-only image dropdown out of the APK.
+        const hasFlagOptions = !isAndroidAppBuild && self.optionsList.some($option => !!$option.dataset.flagCode);
+        if (hasFlagOptions) {
+            $select.addEventListener('mousedown', e => {
+                e.preventDefault();
+                BxSelectElement.toggleFlagDropdown.call(self, self);
+            });
+
+            $select.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    BxSelectElement.toggleFlagDropdown.call(self, self);
+                }
+            });
+        }
 
         let $btnPrev;
         let $btnNext;
@@ -280,6 +303,87 @@ export class BxSelectElement extends HTMLSelectElement {
         window.setTimeout(() => document.addEventListener('pointerdown', closeOnOutside, true));
     }
 
+    /** Render flagged options outside the native select, which only supports
+     * text and turns regional-indicator flags into country letters on Windows. */
+    private static toggleFlagDropdown(this: BxSelectElement, $anchor: HTMLElement) {
+        if (this.$flagDropdown) {
+            this.closeFlagDropdown();
+            return;
+        }
+
+        const $dropdown = CE('div', { class: 'bx-select-flag-dropdown' });
+        let currentGroup = '';
+        for (const [$index, $option] of this.optionsList.entries()) {
+            const $parent = $option.parentElement;
+            const group = $parent instanceof HTMLOptGroupElement ? $parent.label : '';
+            if (group && group !== currentGroup) {
+                currentGroup = group;
+                $dropdown.appendChild(CE('div', { class: 'bx-select-flag-dropdown-group' }, group));
+            }
+
+            const flagCode = $option.dataset.flagCode;
+            const $item = CE('button', {
+                class: 'bx-select-flag-dropdown-option',
+                type: 'button',
+                _dataset: { selected: $option.selected },
+                disabled: $option.disabled,
+            },
+                flagCode ? CE('img', {
+                    class: 'bx-select-flag-image',
+                    src: `https://flagcdn.com/w40/${flagCode}.png`,
+                    alt: '',
+                }) : '',
+                CE('span', false, $option.dataset.label || $option.textContent || ''),
+            ) as HTMLButtonElement;
+
+            let selected = false;
+            const selectOption = (e: Event) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (selected) {
+                    return;
+                }
+                selected = true;
+
+                // Use selectedIndex as well as value: this works for the
+                // special "default" server option and mirrors a native pick.
+                this.$select.selectedIndex = $index;
+                this.$select.value = $option.value;
+                this.visibleIndex = $index;
+                this.$select.dispatchEvent(new Event('input', { bubbles: true }));
+                this.$select.dispatchEvent(new Event('change', { bubbles: true }));
+                BxSelectElement.resetIndicators.call(this);
+                BxSelectElement.render.call(this);
+                this.closeFlagDropdown();
+            };
+            // Pointerdown is intentional: the invisible native <select>
+            // otherwise consumes the later click on some Windows browsers.
+            $item.addEventListener('pointerdown', selectOption);
+            $item.addEventListener('click', selectOption);
+            $dropdown.appendChild($item);
+        }
+
+        const bounds = $anchor.getBoundingClientRect();
+        $dropdown.style.minWidth = `${Math.max(220, bounds.width)}px`;
+        // Keep it in the selector's scroll container so it moves with the
+        // settings panel, exactly like the other settings lists.
+        $anchor.append($dropdown);
+        this.$flagDropdown = $dropdown;
+
+        const closeOnOutside = (event: PointerEvent) => {
+            if (event.target instanceof Node && $dropdown.contains(event.target)) {
+                return;
+            }
+            this.closeFlagDropdown();
+        };
+        this.closeFlagDropdown = () => {
+            document.removeEventListener('pointerdown', closeOnOutside, true);
+            $dropdown.remove();
+            this.$flagDropdown = null;
+        };
+        window.setTimeout(() => document.addEventListener('pointerdown', closeOnOutside, true));
+    }
+
     private static resetIndicators(this: BxSelectElement) {
         const {
             optionsList,
@@ -340,12 +444,28 @@ export class BxSelectElement extends HTMLSelectElement {
             const hasLabel = $parent instanceof HTMLOptGroupElement || this.$select.querySelector('optgroup');
 
             content = $option.dataset.label || $option.textContent || '';
-            if (content && hasLabel) {
-                const groupLabel = $parent instanceof HTMLOptGroupElement ? $parent.label : ' ';
+            const flag = $option.dataset.flag;
+            const flagCode = $option.dataset.flagCode;
+            if (content && (hasLabel || flag || flagCode)) {
+                const groupLabel = $parent instanceof HTMLOptGroupElement ? $parent.label : '';
 
                 $label.innerHTML = '';
                 const fragment = document.createDocumentFragment();
-                fragment.appendChild(CE('span', false, groupLabel));
+                if (hasLabel) {
+                    fragment.appendChild(CE('span', false, groupLabel));
+                }
+                if (flagCode) {
+                    // Regional-indicator emoji are displayed as "BR"/"US" on
+                    // several Windows installations. A real image keeps the
+                    // same flag appearance as Android on every desktop.
+                    fragment.appendChild(CE('img', {
+                        class: 'bx-select-flag-image',
+                        src: `https://flagcdn.com/w40/${flagCode}.png`,
+                        alt: '',
+                    }));
+                } else if (flag) {
+                    fragment.appendChild(CE('span', { class: 'bx-select-flag' }, flag));
+                }
                 fragment.appendChild(document.createTextNode(content));
 
                 $label.appendChild(fragment);

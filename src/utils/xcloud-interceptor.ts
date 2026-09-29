@@ -92,6 +92,14 @@ export class XcloudInterceptor {
                 shortName = match[1] as string;
                 if (serverExtra[regionName]) {
                     const info = serverExtra[regionName];
+                    region.flag = info[0];
+                    // Windows may render regional-indicator emoji as the two
+                    // letters ("BR", "US"). Keep a real country code for the
+                    // desktop UI to use a flag image instead.
+                    region.flagCode = [...info[0]]
+                        .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
+                        .join('')
+                        .toLowerCase();
                     shortName = info[0] + ' ' + shortName;
                     region.displayName = info[1];
                     region.contintent = info[2];

@@ -185,6 +185,7 @@ vec3 interpolateMotion(sampler2D previous, sampler2D current, vec2 uv) {
             bestOffset = offset;
         }
     }
+    vec3 previousColor = texture(previous, uv).rgb;
     vec3 previousWarped = texture(previous, uv + bestOffset * (1.0 - interpolation)).rgb;
     vec3 currentColor = texture(current, uv).rgb;
     // Reject unreliable matches (scene changes, HUD and fast/complex motion)
@@ -196,8 +197,13 @@ vec3 interpolateMotion(sampler2D previous, sampler2D current, vec2 uv) {
     // every scheduled "generated" frame visually identical. Keep a temporal
     // blend as a fallback so each intermediate presentation has a distinct
     // position in time; the warped result takes over as confidence rises.
-    vec3 temporalFallback = mix(texture(previous, uv).rgb, currentColor, interpolation);
+    vec3 temporalFallback = mix(previousColor, currentColor, interpolation);
     vec3 generatedColor = mix(temporalFallback, interpolated, confidence);
+    // Scene cuts and fast flashes have no reliable motion path. Prefer the
+    // newest source frame in those areas to avoid a full-screen ghost while
+    // also reusing the already sampled previous color.
+    float sceneChange = smoothstep(0.18, 0.40, abs(luma(currentColor) - luma(previousColor)));
+    generatedColor = mix(generatedColor, currentColor, sceneChange);
     vec2 hudTexel = 1.0 / iSourceResolution.xy;
     float localEdge = abs(luma(texture(current, uv + vec2(hudTexel.x, 0.0)).rgb) - luma(texture(current, uv - vec2(hudTexel.x, 0.0)).rgb))
         + abs(luma(texture(current, uv + vec2(0.0, hudTexel.y)).rgb) - luma(texture(current, uv - vec2(0.0, hudTexel.y)).rgb));

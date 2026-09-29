@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readFile, readdir } from "node:fs/promises";
+import { copyFile, readFile, readdir } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { sys } from "typescript";
 // @ts-ignore
@@ -12,7 +12,9 @@ import { assert } from "node:console";
 import { ESLint } from "eslint";
 
 enum BuildTarget {
+    /** Browser userscript distributed for desktop browsers. */
     ALL = 'all',
+    /** Dedicated bundle embedded by the Android WebView wrapper. */
     ANDROID_APP = 'android-app',
     MOBILE = 'mobile',
     WEBOS = 'webos',
@@ -195,7 +197,7 @@ async function buildPatches() {
     }));
 }
 
-async function build(target: BuildTarget, params: { version: string, variant: BuildVariant, pretty: boolean, meta: boolean }, config: any={}) {
+async function build(target: BuildTarget, params: { version: string, variant: BuildVariant, pretty: boolean, meta: boolean }, config: { skipPatches?: boolean } = {}) {
     const { version, variant, pretty, meta } = params;
 
     console.log('-- Target:', target);
@@ -219,7 +221,9 @@ async function build(target: BuildTarget, params: { version: string, variant: Bu
 
     const outDir = './dist';
 
-    await buildPatches();
+    if (!config.skipPatches) {
+        await buildPatches();
+    }
 
     let output = await Bun.build({
         entrypoints: ['src/index.ts'],
@@ -256,6 +260,13 @@ async function build(target: BuildTarget, params: { version: string, variant: Bu
     // Save to script
     await Bun.write(path, scriptHeader + result);
 
+    // The Android wrapper must never consume the desktop userscript by
+    // accident. Keep a separate, target-specific asset and update it as part
+    // of the same build that produced it.
+    if (target === BuildTarget.ANDROID_APP) {
+        await copyFile(path, './mobile-android/app/src/main/assets/better-xcloud-plus.android.user.js');
+    }
+
     // Create meta file (don't build if it's beta version)
     if (meta && !version.includes('beta') && variant === 'full') {
         await Bun.write(outDir + '/' + outputMetaName, txtMetaHeader.replace('[[VERSION]]', version));
@@ -274,7 +285,7 @@ async function build(target: BuildTarget, params: { version: string, variant: Bu
 
 const buildTargets = [
     BuildTarget.ALL,
-    // BuildTarget.ANDROID_APP,
+    BuildTarget.ANDROID_APP,
     // BuildTarget.MOBILE,
     // BuildTarget.WEBOS,
 ];
@@ -300,6 +311,14 @@ const { values, positionals } = parseArgs({
             type: 'boolean',
             default: false,
         },
+        target: {
+            type: 'string',
+            default: 'both',
+        },
+        skipPatches: {
+            type: 'boolean',
+            default: false,
+        },
     },
     strict: true,
     allowPositionals: true,
@@ -309,6 +328,8 @@ const { values, positionals } = parseArgs({
         variant: BuildVariant,
         pretty: boolean,
         meta: boolean,
+        target: string,
+        skipPatches: boolean,
     },
     positionals: string[],
 };
@@ -324,9 +345,24 @@ if (values['variant'] !== 'full' && values['variant'] !== 'lite') {
 }
 
 async function main() {
-    const config = {};
-    console.log(`Building: VERSION=${values['version']}, VARIANT=${values['variant']}`);
-    for (const target of buildTargets) {
+    // Patches are shared by the two bundles, so build them once before
+    // producing the desktop and Android outputs.
+    if (!values.skipPatches) {
+        await buildPatches();
+    }
+
+    const config = { skipPatches: true };
+    const selectedTargets = values.target === 'both'
+        ? buildTargets
+        : buildTargets.filter(target => target === values.target);
+
+    if (!selectedTargets.length) {
+        console.log('--target must be either "both", "all", or "android-app"');
+        sys.exit(-1);
+    }
+
+    console.log(`Building: VERSION=${values['version']}, VARIANT=${values['variant']}, TARGET=${values.target}`);
+    for (const target of selectedTargets) {
         await build(target, values, config);
     }
 

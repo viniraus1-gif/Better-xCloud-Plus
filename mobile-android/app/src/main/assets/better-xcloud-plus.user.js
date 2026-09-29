@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      0.0.1-beta
+// @version      0.1.0-vx.46
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -203,6 +203,9 @@ class UserAgent {
   let userAgent = UserAgent.getDefault().toLowerCase(), result = /iphone|ipad|android/.test(userAgent);
   return this.#isMobile = result, result;
  }
+ static isMobileDevice() {
+  return BX_FLAGS.DeviceInfo.deviceType === "android-handheld" || this.isMobile();
+ }
  static spoof() {
   let profile = UserAgent.#config.profile;
   if (profile === "default") return;
@@ -213,7 +216,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "0.0.1-beta", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "0.1.0-vx.46", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -1528,7 +1531,10 @@ class GlobalSettingsStorage extends BaseSettingsStorage {
   "mkb.cursor.hideIdle": {
    requiredVariants: "full",
    label: t("hide-idle-cursor"),
-   default: !1
+   default: !1,
+   desktopOnly: !0,
+   unsupported: UserAgent.isMobileDevice(),
+   unsupportedNote: "⚠️ Exclusivo de PC — não suportado no celular."
   },
   "ui.feedbackDialog.disabled": {
    requiredVariants: "full",
@@ -1581,10 +1587,12 @@ class GlobalSettingsStorage extends BaseSettingsStorage {
    requiredVariants: "full",
    label: t("enable-mkb"),
    default: !1,
-   unsupported: !STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb,
+   desktopOnly: !0,
+   unsupported: UserAgent.isMobileDevice() || !STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb,
    ready: (setting) => {
     let note;
-    if (setting.unsupported) note = t("browser-unsupported-feature");
+    if (UserAgent.isMobileDevice()) note = "Exclusivo de PC — não suportado no celular.";
+    else if (setting.unsupported) note = t("browser-unsupported-feature");
     else note = t("mkb-disclaimer");
     setting.unsupportedNote = () => CE("span", !1, "⚠️ " + note);
    }
@@ -1593,6 +1601,7 @@ class GlobalSettingsStorage extends BaseSettingsStorage {
    requiredVariants: "full",
    label: t("native-mkb"),
    default: "default",
+   desktopOnly: !0,
    options: {
     default: t("default"),
     off: t("off"),
@@ -1602,12 +1611,15 @@ class GlobalSettingsStorage extends BaseSettingsStorage {
     if (STATES.browser.capabilities.emulatedNativeMkb) ;
     else if (UserAgent.isMobile()) setting.unsupported = !0, setting.unsupportedValue = "off", delete setting.options["default"], delete setting.options["on"];
     else delete setting.options["on"];
+    if (UserAgent.isMobileDevice()) setting.unsupported = !0, setting.unsupportedValue = "off", setting.unsupportedNote = "⚠️ Exclusivo de PC — não suportado no celular.";
    }
   },
   "nativeMkb.forcedGames": {
    label: t("force-native-mkb-games"),
    default: [],
-   unsupported: !AppInterface && UserAgent.isMobile(),
+   desktopOnly: !0,
+   unsupported: UserAgent.isMobileDevice(),
+   unsupportedNote: "⚠️ Exclusivo de PC — não suportado no celular.",
    ready: (setting) => {
     if (!setting.unsupported) setting.multipleOptions = GhPagesUtils.getNativeMkbCustomList(!0), BxEventBus.Script.once("list.forcedNativeMkb.updated", (payload) => {
       setting.multipleOptions = payload.data.data;
@@ -1696,7 +1708,11 @@ class GlobalSettingsStorage extends BaseSettingsStorage {
   },
   "ui.hub.hoverEffects": {
    label: "Hub Plus: efeito ao passar o mouse",
-   default: !0
+   default: !0,
+   desktopOnly: !0,
+   unsupported: UserAgent.isMobileDevice(),
+   unsupportedValue: !1,
+   unsupportedNote: "⚠️ Exclusivo de PC — não suportado no celular."
   },
   "ui.hub.animations": {
    label: "Hub Plus: animações dos cards",
@@ -3719,7 +3735,7 @@ class NativeMkbHandler extends MkbHandler {
   return NativeMkbHandler.instance;
  }
  LOG_TAG = "NativeMkbHandler";
- static isAllowed = () => STATES.browser.capabilities.emulatedNativeMkb && getGlobalPref("nativeMkb.mode") === "on";
+ static isAllowed = () => !UserAgent.isMobileDevice() && STATES.browser.capabilities.emulatedNativeMkb && getGlobalPref("nativeMkb.mode") === "on";
  pointerClient;
  enabled = !1;
  mouseButtonsPressed = 0;
@@ -4024,7 +4040,7 @@ class EmulatedMkbHandler extends MkbHandler {
  }
  static LOG_TAG = "EmulatedMkbHandler";
  static isAllowed() {
-  return getGlobalPref("mkb.enabled") && (AppInterface || !UserAgent.isMobile());
+  return getGlobalPref("mkb.enabled") && !UserAgent.isMobileDevice();
  }
  PRESET;
  VIRTUAL_GAMEPAD = {
@@ -5546,7 +5562,39 @@ class NavigationDialogManager {
   dialog && dialog.onBeforeUnmount(), this.$container.firstChild?.remove(), dialog && dialog.onUnmounted(), this.dialog = null;
  }
 }
-var LOG_TAG = "TouchController";
+var LOG_TAG = "TouchController", GENERIC_PERSONAL_LAYOUT = {
+ name: "Layout pessoal",
+ author: "",
+ content: {
+  left: {
+   inner: [{
+    type: "joystick",
+    axis: { input: "axisXY", output: "leftJoystick" }
+   }],
+   outer: [[
+    { type: "button", action: "leftTrigger" },
+    { type: "button", action: "leftBumper" }
+   ]]
+  },
+  right: {
+   inner: [{
+    type: "joystick",
+    axis: { input: "axisXY", output: "rightJoystick" }
+   }],
+   outer: [
+    [{ type: "button", action: "rightTrigger" }, { type: "button", action: "rightBumper" }],
+    { type: "button", action: "gamepadY" },
+    { type: "button", action: "gamepadX" },
+    { type: "button", action: "gamepadB" },
+    { type: "button", action: "gamepadA" }
+   ]
+  },
+  upper: {
+   left: [{ type: "button", action: "view" }],
+   right: [{ type: "button", action: "menu" }]
+  }
+ }
+};
 class TouchController {
  static #EVENT_SHOW_DEFAULT_CONTROLLER = new MessageEvent("message", {
   data: JSON.stringify({
@@ -5564,6 +5612,24 @@ class TouchController {
  static #currentLayoutId;
  static #customList;
  static #xboxTitleId = null;
+ static #getPersonalLayouts() {
+  try {
+   let layouts = JSON.parse(window.localStorage.getItem("BetterXcloud.TouchLayouts.Personal") || "{}");
+   return layouts && typeof layouts === "object" ? layouts : {};
+  } catch {
+   return {};
+  }
+ }
+ static #savePersonalLayouts(layouts) {
+  window.localStorage.setItem("BetterXcloud.TouchLayouts.Personal", JSON.stringify(layouts));
+ }
+ static #mergePersonalLayouts(definition) {
+  let titleId = TouchController.#xboxTitleId;
+  if (!definition || !titleId) return definition;
+  let personal = TouchController.#getPersonalLayouts()[titleId];
+  if (personal) Object.assign(definition.layouts, personal);
+  return definition;
+ }
  static setXboxTitleId(xboxTitleId) {
   TouchController.#xboxTitleId = xboxTitleId;
  }
@@ -5571,6 +5637,41 @@ class TouchController {
   let xboxTitleId = TouchController.#xboxTitleId;
   if (!xboxTitleId) return null;
   return TouchController.#customLayouts[xboxTitleId];
+ }
+ static getCurrentLayoutId() {
+  return TouchController.#currentLayoutId;
+ }
+ static createPersonalLayout(layoutId) {
+  let titleId = TouchController.#xboxTitleId, definition = TouchController.getCustomLayouts();
+  if (!titleId) return null;
+  if (!definition) definition = {
+    name: "Layout pessoal",
+    product_id: titleId,
+    default_layout: "bx-personal",
+    layouts: {}
+   }, TouchController.#customLayouts[titleId] = definition;
+  let source = definition.layouts[layoutId || definition.default_layout] || GENERIC_PERSONAL_LAYOUT, personalLayouts = TouchController.#getPersonalLayouts(), layoutsForGame = personalLayouts[titleId] ||= {}, id = "bx-personal", copy = JSON.parse(JSON.stringify(source));
+  return copy.name = `${source.name || "Layout"} (Pessoal)`, copy.author = "", layoutsForGame[id] = copy, TouchController.#savePersonalLayouts(personalLayouts), definition.layouts[id] = copy, id;
+ }
+ static updatePersonalLayout(layoutId, text) {
+  let titleId = TouchController.#xboxTitleId, definition = TouchController.getCustomLayouts();
+  if (!titleId || !definition || !layoutId.startsWith("bx-personal")) return !1;
+  try {
+   let layout = JSON.parse(text);
+   if (!layout || typeof layout !== "object" || !layout.content || typeof layout.content !== "object") throw Error("Invalid layout");
+   layout.name = typeof layout.name === "string" && layout.name.trim() ? layout.name.trim() : "Layout pessoal", layout.author = typeof layout.author === "string" ? layout.author : "";
+   let personalLayouts = TouchController.#getPersonalLayouts();
+   return (personalLayouts[titleId] ||= {})[layoutId] = layout, TouchController.#savePersonalLayouts(personalLayouts), definition.layouts[layoutId] = layout, !0;
+  } catch {
+   return !1;
+  }
+ }
+ static removePersonalLayout(layoutId) {
+  let titleId = TouchController.#xboxTitleId;
+  if (!titleId || !layoutId.startsWith("bx-personal")) return !1;
+  let personalLayouts = TouchController.#getPersonalLayouts();
+  if (!personalLayouts[titleId]?.[layoutId]) return !1;
+  return delete personalLayouts[titleId][layoutId], Object.keys(personalLayouts[titleId]).length || delete personalLayouts[titleId], TouchController.#savePersonalLayouts(personalLayouts), delete TouchController.#customLayouts[titleId]?.layouts[layoutId], !0;
  }
  static enable() {
   TouchController.#enabled = !0;
@@ -5617,7 +5718,7 @@ class TouchController {
   }
   try {
    let json = await (await NATIVE_FETCH(GhPagesUtils.getUrl(`touch-layouts/${xboxTitleId}.json`))).json(), layouts = {};
-   json.layouts.forEach(async (layoutName) => {
+   await Promise.all(json.layouts.map(async (layoutName) => {
     let baseLayouts = {};
     if (layoutName in TouchController.#baseCustomLayouts) baseLayouts = TouchController.#baseCustomLayouts[layoutName];
     else try {
@@ -5625,7 +5726,7 @@ class TouchController {
       baseLayouts = (await (await NATIVE_FETCH(layoutUrl)).json()).layouts, TouchController.#baseCustomLayouts[layoutName] = baseLayouts;
      } catch (e) {}
     Object.assign(layouts, baseLayouts);
-   }), json.layouts = layouts, TouchController.#customLayouts[xboxTitleId] = json, window.setTimeout(() => TouchController.#dispatchLayouts(json), 1000);
+   })), json.layouts = layouts, TouchController.#customLayouts[xboxTitleId] = TouchController.#mergePersonalLayouts(json), window.setTimeout(() => TouchController.#dispatchLayouts(json), 1000);
   } catch (e) {
    TouchController.requestCustomLayouts(retries + 1);
   }
@@ -8195,7 +8296,10 @@ class SettingsDialog extends NavigationDialog {
     "mkb.enabled",
     "mkb.cursor.hideIdle"
    ],
-   ...!STATES.browser.capabilities.emulatedNativeMkb && (!STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb) ? {
+   ...UserAgent.isMobileDevice() ? {
+    unsupported: !0,
+    unsupportedNote: "⚠️ Exclusivo de PC — mouse e teclado não são suportados no celular."
+   } : !STATES.browser.capabilities.emulatedNativeMkb && (!STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb) ? {
     unsupported: !0,
     unsupportedNote: CE("a", {
      href: "https://github.com/redphx/better-xcloud/issues/206#issuecomment-1920475657",
@@ -8211,9 +8315,13 @@ class SettingsDialog extends NavigationDialog {
     ($parent) => {
      $parent.appendChild(MkbExtraSettings.renderSettings.apply(this));
     }
-   ]
+   ],
+   ...UserAgent.isMobileDevice() ? {
+    unsupported: !0,
+    unsupportedNote: "⚠️ Exclusivo de PC — atalhos de teclado não são suportados no celular."
+   } : {}
   },
-  NativeMkbHandler.isAllowed() && {
+  NativeMkbHandler.isAllowed() && !UserAgent.isMobileDevice() && {
    requiredVariants: "full",
    group: "native-mkb",
    label: t("native-mkb"),
@@ -8429,6 +8537,7 @@ class SettingsDialog extends NavigationDialog {
   if (pref) prefDefinition = getPrefInfo(pref).definition;
   if (prefDefinition && !this.isSupportedVariant(prefDefinition.requiredVariants)) return;
   let label = prefDefinition?.label || setting.label || "", note = prefDefinition?.note || setting.note, unsupportedNote = prefDefinition?.unsupportedNote || setting.unsupportedNote, experimental = prefDefinition?.experimental || setting.experimental;
+  if (prefDefinition?.desktopOnly && UserAgent.isMobileDevice()) label += " (Exclusivo de PC)";
   if (typeof note === "function") note = note();
   if (typeof unsupportedNote === "function") unsupportedNote = unsupportedNote();
   if (settingTabContent.label && setting.pref) {

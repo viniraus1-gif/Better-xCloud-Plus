@@ -1,5 +1,6 @@
 import { UserAgentProfile } from "@enums/user-agent";
 import { BX_FLAGS } from "./bx-flags";
+import { isAndroidAppBuild } from "@/build-config";
 import { StorageKey } from "@/enums/pref-keys";
 
 type UserAgentConfig = {
@@ -111,6 +112,13 @@ export class UserAgent {
 
         this.#isMobile = result;
         return result;
+    }
+
+    /** Detect the physical device even when xCloud receives a spoofed desktop UA. */
+    static isMobileDevice(): boolean {
+        return isAndroidAppBuild()
+            || BX_FLAGS.DeviceInfo.deviceType === 'android-handheld'
+            || this.isMobile();
     }
 
     static spoof() {

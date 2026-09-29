@@ -27,6 +27,18 @@ export class StreamPlayerManager {
     private constructor() {}
 
     setVideoElement($video: HTMLVideoElement) {
+        // xCloud changes games without always reloading the page. The manager
+        // is a singleton, so retaining a WebGL/WebGPU canvas here leaves it
+        // sampling the previous game's video element. In that state VX may
+        // look enabled, while neither upscaling nor generated-frame metrics
+        // receive frames from the new game.
+        if (this.$video && this.$video !== $video) {
+            this.cleanUpCanvasPlayer();
+            this.playerType = StreamPlayerType.VIDEO;
+            this.playerOptions = {};
+            this.canvasViewportRect = null;
+        }
+
         this.$video = $video;
         this.videoPlayer = new VideoPlayer($video, 'VideoPlayer');
         this.videoPlayer.init();
@@ -274,5 +286,8 @@ export class StreamPlayerManager {
 
     destroy() {
         this.cleanUpCanvasPlayer();
+        this.playerType = StreamPlayerType.VIDEO;
+        this.playerOptions = {};
+        this.canvasViewportRect = null;
     }
 }

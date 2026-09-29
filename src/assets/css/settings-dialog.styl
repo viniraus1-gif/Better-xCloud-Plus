@@ -4,6 +4,8 @@
     top: 0;
     right: 0;
     bottom: 0;
+    transform-origin: right center;
+    animation: bx-settings-menu-open 220ms cubic-bezier(.18, .8, .22, 1) both;
     opacity: 0.98;
     user-select: none;
     -webkit-user-select: none;
@@ -15,6 +17,41 @@
         font-style: italic;
         font-weight: normal;
         height: var(--bx-button-height);
+    }
+}
+
+.bx-settings-dialog.bx-settings-menu-closing {
+    pointer-events: none;
+    animation: bx-settings-menu-close 220ms cubic-bezier(.55, .05, .78, .2) both;
+}
+
+@keyframes bx-settings-menu-open {
+    from {
+        opacity: 0;
+        transform: translateX(28px) scale(.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes bx-settings-menu-close {
+    from {
+        opacity: .98;
+        transform: translateX(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateX(32px) scale(.985);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bx-settings-dialog {
+        animation-duration: 1ms;
     }
 }
 
@@ -220,6 +257,21 @@
             white-space: nowrap;
             min-height: var(--bx-button-height);
             align-content: center;
+        }
+
+        .bx-settings-project-link {
+            flex: 1;
+            height: var(--bx-button-height);
+            padding: 0 12px;
+            text-align: left;
+            text-transform: none;
+            text-decoration: none;
+
+            span {
+                font-size: 20px;
+                font-weight: bold;
+                text-align: left;
+            }
         }
     }
 }

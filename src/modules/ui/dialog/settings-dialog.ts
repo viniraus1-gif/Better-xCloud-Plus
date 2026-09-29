@@ -29,6 +29,8 @@ import { MkbExtraSettings } from "./settings/mkb-extra";
 import { BxEventBus } from "@/utils/bx-event-bus";
 import { getGlobalPref, getPrefInfo, getStreamPref, isStreamPref, setGlobalPref, STORAGE } from "@/utils/pref-utils";
 import { SettingsManager } from "@/modules/settings-manager";
+import { isAndroidAppBuild } from "@/build-config";
+import { VxLabsSettings } from "@/modules/vx/vx-labs-settings";
 
 
 type SettingTabSectionItem = Partial<{
@@ -186,6 +188,7 @@ export class SettingsDialog extends NavigationDialog {
             GlobalPref.STREAM_CODEC_PROFILE,
             GlobalPref.STREAM_MAX_VIDEO_BITRATE,
             GlobalPref.STREAM_PREVENT_RESOLUTION_DROPS,
+            GlobalPref.STREAM_CLOUD_KEEP_ALIVE,
 
             GlobalPref.AUDIO_VOLUME_CONTROL_ENABLED,
 
@@ -202,13 +205,11 @@ export class SettingsDialog extends NavigationDialog {
             GlobalPref.UI_LAYOUT,
             GlobalPref.UI_THEME,
             GlobalPref.UI_IMAGE_QUALITY,
-            GlobalPref.UI_GAME_CARD_SHOW_WAIT_TIME,
             GlobalPref.UI_HUB_CARD_SIZE,
             GlobalPref.UI_HUB_CARD_ROUNDED,
             GlobalPref.UI_HUB_HOVER_EFFECTS,
             GlobalPref.UI_HUB_ANIMATIONS,
             GlobalPref.UI_SIMPLIFY_STREAM_MENU,
-            GlobalPref.UI_SKIP_SPLASH_VIDEO,
             !AppInterface && GlobalPref.UI_SCROLLBAR_HIDE,
             GlobalPref.UI_HIDE_SYSTEM_MENU_ICON,
             GlobalPref.UI_DISABLE_FEEDBACK_DIALOG,
@@ -236,6 +237,7 @@ export class SettingsDialog extends NavigationDialog {
             GlobalPref.LOADING_SCREEN_GAME_ART,
             GlobalPref.LOADING_SCREEN_SHOW_WAIT_TIME,
             GlobalPref.LOADING_SCREEN_ROCKET,
+            GlobalPref.UI_SKIP_SPLASH_VIDEO,
         ],
     }, {
         group: 'other',
@@ -287,7 +289,7 @@ export class SettingsDialog extends NavigationDialog {
                     const appDate = new Date(document.querySelector<HTMLMetaElement>('meta[name=gamepass-app-date]')!.content).toISOString().substring(0, 10);
                     $parent.appendChild(CE('div', {
                         class: 'bx-settings-app-version',
-                    }, `xCloud website version ${appVersion} (${appDate})`));
+                    }, `${t('xcloud-website-version')} ${appVersion} (${appDate})`));
                 } catch (e) {}
             },
 
@@ -305,7 +307,7 @@ export class SettingsDialog extends NavigationDialog {
             $parent => {
                 $parent.appendChild(CE('div', {
                     class: 'bx-original-credits',
-                }, 'Créditos ao criador original: redphx (Better xCloud).'));
+                }, t('original-creator-credits')));
             },
 
             // Clear data
@@ -325,7 +327,7 @@ export class SettingsDialog extends NavigationDialog {
             $parent => {
                 $parent.appendChild(CE('div', { class: 'bx-debug-info' },
                     createButton({
-                        label: 'Debug info',
+                        label: t('debug-info'),
                         style: ButtonStyle.GHOST | ButtonStyle.FULL_WIDTH | ButtonStyle.FOCUSABLE,
                         onClick: e => {
                             const $button = (e.target as HTMLElement).closest('button');
@@ -402,10 +404,28 @@ export class SettingsDialog extends NavigationDialog {
 
     // Experimental local reconstruction and interpolation controls are kept
     // apart from ordinary video settings, so their impact is easier to judge.
-    private readonly TAB_VX_ITEMS: Array<SettingTabSection | false> = [{
+    private readonly TAB_VX_ITEMS: Array<SettingTabSection | false> = [
+        isAndroidAppBuild() && {
+            requiredVariants: 'full',
+            group: 'video',
+            label: t('vx-mobile-warning-title'),
+            unsupportedNote: '⚠️ ' + t('vx-mobile-warning-summary'),
+            content: CE('div', { class: 'bx-settings-dialog-note' },
+                CE('p', false, t('vx-mobile-warning-webgl')),
+                CE('p', false, t('vx-mobile-warning-performance')),
+                CE('p', false, t('vx-mobile-warning-fallback')),
+            ),
+        },
+        {
+            requiredVariants: 'full',
+            group: 'video',
+            label: t('vx-diagnostics'),
+            content: VxLabsSettings.render(),
+        },
+        {
         requiredVariants: 'full',
         group: 'video',
-        label: 'IA VX e reconstrução',
+        label: t('vx-ai-and-reconstruction'),
         items: [
             StreamPref.VX_UPSCALE_TARGET,
             StreamPref.VX_UPSCALE_ALGORITHM,
@@ -427,7 +447,7 @@ export class SettingsDialog extends NavigationDialog {
                     if (!$generationRow || !$targetRow) return;
 
                     const $target = CE('div', { class: 'bx-vx-frame-target-input' },
-                        CE('span', false, 'FPS alvo:'),
+                        CE('span', false, t('vx-target-fps')),
                         $control,
                     );
                     $generationRow.appendChild($target);
@@ -449,14 +469,14 @@ export class SettingsDialog extends NavigationDialog {
             StreamPref.CONTROLLER_POLLING_RATE,
             ($parent => {
                 $parent.appendChild(createSettingRow(
-                    'Remapear botões do controle',
+                    t('remap-controller-buttons'),
                     createButton({
-                        label: 'Abrir remapeamento',
+                        label: t('open-remapping'),
                         icon: BxIcon.MANAGE,
                         style: ButtonStyle.FOCUSABLE | ButtonStyle.PRIMARY | ButtonStyle.NORMAL_CASE,
                         onClick: () => ControllerCustomizationsManagerDialog.getInstance().show({ id: null }),
                     }),
-                    { multiLines: true, $note: CE('div', { class: 'bx-settings-dialog-note' }, 'Crie ou edite um perfil para trocar A, B, X, Y, gatilhos e analógicos.') },
+                    { multiLines: true, $note: CE('div', { class: 'bx-settings-dialog-note' }, t('remap-controller-buttons-note')) },
                 ));
             }),
             ($parent => {
@@ -568,7 +588,10 @@ export class SettingsDialog extends NavigationDialog {
                 GlobalPref.MKB_ENABLED,
                 GlobalPref.MKB_HIDE_IDLE_CURSOR,
             ],
-            ...(!STATES.browser.capabilities.emulatedNativeMkb && (!STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb) ? {
+            ...(UserAgent.isMobileDevice() ? {
+                unsupported: true,
+                unsupportedNote: '⚠️ ' + t('pc-only-not-supported-on-mobile'),
+            } : !STATES.browser.capabilities.emulatedNativeMkb && (!STATES.userAgent.capabilities.mkb || !STATES.browser.capabilities.mkb) ? {
                 unsupported: true,
                 unsupportedNote: CE('a', {
                     href: 'https://github.com/redphx/better-xcloud/issues/206#issuecomment-1920475657',
@@ -579,15 +602,19 @@ export class SettingsDialog extends NavigationDialog {
         {
             requiredVariants: 'full',
             group: 'mkb',
-            label: 'Mapeamento e atalhos',
+            label: t('mapping-and-shortcuts'),
             items: [
                 ($parent: HTMLElement) => {
                     $parent.appendChild(MkbExtraSettings.renderSettings.apply(this));
                 },
             ],
+            ...(UserAgent.isMobileDevice() ? {
+                unsupported: true,
+                unsupportedNote: '⚠️ ' + t('pc-only-not-supported-on-mobile'),
+            } : {}),
         },
 
-        NativeMkbHandler.isAllowed() && {
+        NativeMkbHandler.isAllowed() && !UserAgent.isMobileDevice() && {
             requiredVariants: 'full',
             group: 'native-mkb',
             label: t('native-mkb'),
@@ -616,21 +643,21 @@ export class SettingsDialog extends NavigationDialog {
         global: {
             group: 'global',
             icon: BxIcon.HOME,
-            label: 'Geral',
+            label: t('general'),
             items: this.TAB_GLOBAL_ITEMS,
         },
 
         stream: {
             group: 'stream',
             icon: BxIcon.DISPLAY,
-            label: 'Imagem',
+            label: t('image'),
             items: this.TAB_DISPLAY_ITEMS,
         },
 
         vx: isFullVersion() && {
             group: 'vx',
-            icon: BxIcon.EYE,
-            label: 'IA VX',
+            icon: BxIcon.AI,
+            label: t('vx-tab'),
             items: this.TAB_VX_ITEMS,
             requiredVariants: 'full',
         },
@@ -638,7 +665,7 @@ export class SettingsDialog extends NavigationDialog {
         controller: {
             group: 'controller',
             icon: BxIcon.CONTROLLER,
-            label: 'Controle',
+            label: t('controller'),
             items: this.TAB_CONTROLLER_ITEMS,
             requiredVariants: 'full',
         },
@@ -646,7 +673,7 @@ export class SettingsDialog extends NavigationDialog {
         mkb: isFullVersion() && {
             group: 'mkb',
             icon: BxIcon.NATIVE_MKB,
-            label: 'Mouse e teclado',
+            label: t('mouse-and-keyboard'),
             items: this.TAB_MKB_ITEMS,
             requiredVariants: 'full',
         },
@@ -654,7 +681,7 @@ export class SettingsDialog extends NavigationDialog {
         stats: {
             group: 'stats',
             icon: BxIcon.STREAM_STATS,
-            label: 'Estatísticas',
+            label: t('stream-stats'),
             items: this.TAB_STATS_ITEMS,
         },
 
@@ -700,6 +727,13 @@ export class SettingsDialog extends NavigationDialog {
 
     getContent(): HTMLElement {
         return this.$container;
+    }
+
+    onBeforeMount(): void {
+        // The tutorial can animate this reusable dialog out. Remove that
+        // one-shot class before every normal opening, otherwise its persisted
+        // fill state makes the panel appear to open and close immediately.
+        this.$container.classList.remove('bx-settings-menu-closing');
     }
 
     onMounted(): void {
@@ -759,9 +793,7 @@ export class SettingsDialog extends NavigationDialog {
     }
 
     private renderTab(settingTab: SettingTab) {
-        const $icon = settingTab.group === 'vx'
-            ? CE('span', { class: 'bx-settings-tab-ai-icon', 'aria-hidden': 'true' }, 'IA')
-            : createSvgIcon(settingTab.icon as any);
+        const $icon = createSvgIcon(settingTab.icon as any);
         const $tab = CE('button', {
             class: 'bx-settings-tab bx-focusable',
             type: 'button',
@@ -853,8 +885,15 @@ export class SettingsDialog extends NavigationDialog {
             let value = regionName;
 
             let label = `${region.shortName} - ${region.displayName ?? regionName}`;
+            // The Android build keeps its original emoji/text selector.
+            // The image-backed flag UI is only necessary on desktop, where
+            // Windows can render country emoji as plain letters.
+            let desktopLabel = isAndroidAppBuild
+                ? label
+                : `${region.flag ? region.shortName.replace(region.flag, '').trim() : region.shortName} - ${region.displayName ?? regionName}`;
             if (region.isDefault) {
                 label += ` (${t('default')})`;
+                desktopLabel += ` (${t('default')})`;
                 value = 'default';
 
                 if (selectedValue === regionName) {
@@ -864,7 +903,14 @@ export class SettingsDialog extends NavigationDialog {
 
             setting.options[value] = label;
 
-            const $option = CE('option', { value }, label);
+            const $option = CE('option', {
+                value,
+                _dataset: {
+                    label: desktopLabel,
+                    flag: isAndroidAppBuild ? '' : (region.flag || ''),
+                    flagCode: isAndroidAppBuild ? '' : (region.flagCode || ''),
+                },
+            }, label);
             const continent = continents[region.contintent];
             if (!continent.children) {
                 continent.children = [];
@@ -985,6 +1031,10 @@ export class SettingsDialog extends NavigationDialog {
         let unsupportedNote: string | undefined | (() => HTMLElement) | HTMLElement = prefDefinition?.unsupportedNote || setting.unsupportedNote;
         const experimental = prefDefinition?.experimental || setting.experimental;
 
+        if (prefDefinition?.desktopOnly && UserAgent.isMobileDevice()) {
+            label += ` (${t('pc-only')})`;
+        }
+
         // Render note lazily
         if (typeof note === 'function') {
             note = note();
@@ -1069,8 +1119,9 @@ export class SettingsDialog extends NavigationDialog {
 
             let label = section.label;
 
-            // If label is "Better xCloud" => create a link to Releases page
-            if (label === t('better-xcloud')) {
+            // The project heading is a direct link to this fork's repository.
+            const isProjectHeading = label === t('better-xcloud');
+            if (isProjectHeading) {
                 label += ' ' + SCRIPT_VERSION;
 
                 if (SCRIPT_VARIANT === 'lite') {
@@ -1085,7 +1136,13 @@ export class SettingsDialog extends NavigationDialog {
                         orientation: 'horizontal',
                     }
                 },
-                    CE('span', false, label),
+                    isProjectHeading ? createButton({
+                        label,
+                        url: 'https://github.com/viniraus1-gif/Better-xCloud-Plus',
+                        title: t('open-project-on-github'),
+                        classes: ['bx-settings-project-link'],
+                        style: ButtonStyle.FROSTED | ButtonStyle.FOCUSABLE | ButtonStyle.NORMAL_CASE,
+                    }) : CE('span', false, label),
                     section.helpUrl && createButton({
                             icon: BxIcon.QUESTION,
                             style: ButtonStyle.GHOST | ButtonStyle.FOCUSABLE,
