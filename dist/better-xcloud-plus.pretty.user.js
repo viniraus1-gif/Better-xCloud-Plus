@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.2
+// @version      1.0.3
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.2", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.3", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -5122,12 +5122,22 @@ class BxSelectElement extends HTMLSelectElement {
   self.isControllerFriendly = isControllerFriendly, self.isMultiple = $select.multiple, self.visibleIndex = $select.selectedIndex;
   let originalSetValue = $select.setValue;
   self.$select = $select, self.optionsList = Array.from($select.querySelectorAll("option")), self.$indicators = CE("div", { class: "bx-select-indicators" }), self.indicatorsList = [];
-  let hasFlagOptions = !isAndroidAppBuild && self.optionsList.some(($option) => !!($option.dataset.flagCode || BxSelectElement.getFlagCode($option)));
-  if (hasFlagOptions) $select.addEventListener("pointerdown", (e) => {
+  let hasFlagOptions = !isAndroidAppBuild && ($select.dataset.serverRegion === "true" || self.optionsList.some(($option) => !!BxSelectElement.getFlagCode($option)));
+  if (hasFlagOptions) {
+   for (let [property, value] of [
+    ["position", "absolute"],
+    ["top", "-9999px"],
+    ["left", "-9999px"],
+    ["visibility", "hidden"],
+    ["pointer-events", "none"]
+   ])
+    $select.style.setProperty(property, value, "important");
+   $select.addEventListener("pointerdown", (e) => {
     e.preventDefault(), e.stopImmediatePropagation(), BxSelectElement.toggleFlagDropdown.call(self, self);
    }, !0), $select.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") e.preventDefault(), BxSelectElement.toggleFlagDropdown.call(self, self);
    });
+  }
   let $btnPrev, $btnNext;
   if (isControllerFriendly) {
    $btnPrev = createButton({
@@ -5159,7 +5169,7 @@ class BxSelectElement extends HTMLSelectElement {
     let $option = BxSelectElement.getOptionAtIndex.call(self, self.visibleIndex);
     $option && ($option.selected = e.target.checked), BxEvent.dispatch($select, "input");
    });
-  else if ($content = CE("div", !1, self.$label = CE("label", { for: $select.id + "_checkbox" }, ""), self.$indicators), hasFlagOptions && isControllerFriendly) $content.tabIndex = 0, $content.setAttribute("role", "button"), $content.addEventListener("pointerdown", (e) => {
+  else if ($content = CE("div", !1, self.$label = CE("label", { for: $select.id + "_checkbox" }, ""), self.$indicators), hasFlagOptions) $content.tabIndex = 0, $content.setAttribute("role", "button"), $content.addEventListener("pointerdown", (e) => {
     e.preventDefault(), BxSelectElement.toggleFlagDropdown.call(self, $content);
    }), $content.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") e.preventDefault(), BxSelectElement.toggleFlagDropdown.call(self, $content);
@@ -5279,7 +5289,7 @@ class BxSelectElement extends HTMLSelectElement {
  }
  static getFlagCode($option) {
   if ($option.dataset.flagCode) return $option.dataset.flagCode;
-  let code = [...$option.dataset.flag || ""].map((char) => char.codePointAt(0) - 127462).filter((value) => value >= 0 && value < 26).map((value) => String.fromCharCode(value + 65)).join("").toLowerCase();
+  let code = [...$option.dataset.flag || $option.textContent || ""].map((char) => char.codePointAt(0) - 127462).filter((value) => value >= 0 && value < 26).map((value) => String.fromCharCode(value + 65)).join("").toLowerCase();
   return code.length === 2 ? code : "";
  }
  static getOptionAtIndex(index) {
@@ -9076,7 +9086,8 @@ class SettingsDialog extends NavigationDialog {
    }
   }, $control = CE("select", {
    id: `bx_setting_${escapeCssSelector(setting.pref)}`,
-   tabindex: 0
+   tabindex: 0,
+   _dataset: { serverRegion: "true" }
   });
   $control.name = $control.id, $control.addEventListener("input", (e) => {
    setGlobalPref(setting.pref, e.target.value, "ui"), this.onGlobalSettingChanged(e);

@@ -871,6 +871,7 @@ export class SettingsDialog extends NavigationDialog {
         const $control = CE('select', {
             id: `bx_setting_${escapeCssSelector(setting.pref!)}`,
             tabindex: 0,
+            _dataset: { serverRegion: 'true' },
         });
         $control.name = $control.id;
 

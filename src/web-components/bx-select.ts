@@ -75,10 +75,21 @@ export class BxSelectElement extends HTMLSelectElement {
         // Some Xbox responses arrive from cache before `flagCode` was added
         // to the region object. The emoji is still present, and is enough to
         // derive the ISO code used by the image-based desktop control.
-        const hasFlagOptions = !isAndroidAppBuild && self.optionsList.some($option =>
-            !!($option.dataset.flagCode || BxSelectElement.getFlagCode($option))
-        );
+        const hasFlagOptions = !isAndroidAppBuild && ($select.dataset.serverRegion === 'true'
+            || self.optionsList.some($option => !!BxSelectElement.getFlagCode($option)));
         if (hasFlagOptions) {
+            // This must win over all responsive and controller-mode rules.
+            // A visible native <select> can never render image flags.
+            for (const [property, value] of [
+                ['position', 'absolute'],
+                ['top', '-9999px'],
+                ['left', '-9999px'],
+                ['visibility', 'hidden'],
+                ['pointer-events', 'none'],
+            ] as const) {
+                $select.style.setProperty(property, value, 'important');
+            }
+
             // Capture pointerdown before Chromium performs its native select
             // action. A bubbling mousedown listener is too late on some
             // Windows builds, which is why the text-only list was still
@@ -171,7 +182,7 @@ export class BxSelectElement extends HTMLSelectElement {
             // Controller-friendly selects keep the native control offscreen.
             // Make the visible value panel open the same flagged menu, instead
             // of relying on a hidden <select> to receive the pointer event.
-            if (hasFlagOptions && isControllerFriendly) {
+            if (hasFlagOptions) {
                 $content.tabIndex = 0;
                 $content.setAttribute('role', 'button');
                 $content.addEventListener('pointerdown', e => {
@@ -450,7 +461,7 @@ export class BxSelectElement extends HTMLSelectElement {
             return $option.dataset.flagCode;
         }
 
-        const code = [...($option.dataset.flag || '')]
+        const code = [...($option.dataset.flag || $option.textContent || '')]
             .map(char => char.codePointAt(0)! - 0x1F1E6)
             .filter(value => value >= 0 && value < 26)
             .map(value => String.fromCharCode(value + 65))
