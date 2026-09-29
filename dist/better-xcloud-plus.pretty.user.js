@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.6
+// @version      1.0.7
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.6", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.7", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -9068,62 +9068,9 @@ class SettingsDialog extends NavigationDialog {
   $elm instanceof HTMLElement && this.resetHighlightedSetting($elm);
  }
  renderServerSetting(setting) {
-  if (!isAndroidAppBuild) return this.renderDesktopServerSetting(setting);
-  let selectedValue = getGlobalPref("server.region"), continents = {
-   "america-north": {
-    label: t("continent-north-america")
-   },
-   "america-south": {
-    label: t("continent-south-america")
-   },
-   asia: {
-    label: t("continent-asia")
-   },
-   australia: {
-    label: t("continent-australia")
-   },
-   europe: {
-    label: t("continent-europe")
-   },
-   other: {
-    label: t("other")
-   }
-  }, $control = CE("select", {
-   id: `bx_setting_${escapeCssSelector(setting.pref)}`,
-   tabindex: 0,
-   _dataset: { serverRegion: "true" }
-  });
-  $control.name = $control.id, $control.addEventListener("input", (e) => {
-   setGlobalPref(setting.pref, e.target.value, "ui"), this.onGlobalSettingChanged(e);
-  }), setting.options = {};
-  for (let regionName in STATES.serverRegions) {
-   let region = STATES.serverRegions[regionName], value = regionName, label = `${region.shortName} - ${region.displayName ?? regionName}`, desktopLabel = isAndroidAppBuild ? label : `${region.flag ? region.shortName.replace(region.flag, "").trim() : region.shortName} - ${region.displayName ?? regionName}`;
-   if (region.isDefault) {
-    if (label += ` (${t("default")})`, desktopLabel += ` (${t("default")})`, value = "default", selectedValue === regionName) selectedValue = "default";
-   }
-   setting.options[value] = label;
-   let flagCode = region.flagCode || [...region.flag || ""].map((char) => String.fromCharCode(char.codePointAt(0) - 127462 + 65)).join("").toLowerCase(), $option = CE("option", {
-    value,
-    _dataset: {
-     label: desktopLabel,
-     flag: isAndroidAppBuild ? "" : region.flag || "",
-     flagCode: isAndroidAppBuild ? "" : flagCode
-    }
-   }, label), continent = continents[region.contintent];
-   if (!continent.children) continent.children = [];
-   continent.children.push($option);
-  }
-  let fragment = document.createDocumentFragment(), key;
-  for (key in continents) {
-   let continent = continents[key];
-   if (!continent.children) continue;
-   fragment.appendChild(CE("optgroup", {
-    label: continent.label
-   }, ...continent.children));
-  }
-  return $control.appendChild(fragment), $control.disabled = Object.keys(STATES.serverRegions).length === 0, $control.value = selectedValue, $control;
+  return this.renderFlagServerSetting(setting);
  }
- renderDesktopServerSetting(setting) {
+ renderFlagServerSetting(setting) {
   let selectedValue = getGlobalPref("server.region"), continents = {
    "america-north": { label: t("continent-north-america"), children: [] },
    "america-south": { label: t("continent-south-america"), children: [] },

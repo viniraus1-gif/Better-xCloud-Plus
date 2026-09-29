@@ -842,115 +842,7 @@ export class SettingsDialog extends NavigationDialog {
     }
 
     private renderServerSetting(setting: SettingTabSectionItem): HTMLElement {
-        if (!isAndroidAppBuild) {
-            return this.renderDesktopServerSetting(setting);
-        }
-
-        let selectedValue = getGlobalPref(GlobalPref.SERVER_REGION);
-
-        const continents: Record<ServerContinent, {
-            label: string,
-            children?: HTMLOptionElement[],
-        }> = {
-            'america-north': {
-                label: t('continent-north-america'),
-            },
-            'america-south': {
-                label: t('continent-south-america'),
-            },
-            asia: {
-                label: t('continent-asia'),
-            },
-            australia: {
-                label: t('continent-australia'),
-            },
-            europe: {
-                label: t('continent-europe'),
-            },
-            other: {
-                label: t('other'),
-            },
-        };
-
-        const $control = CE('select', {
-            id: `bx_setting_${escapeCssSelector(setting.pref!)}`,
-            tabindex: 0,
-            _dataset: { serverRegion: 'true' },
-        });
-        $control.name = $control.id;
-
-        $control.addEventListener('input', (e: Event) => {
-            setGlobalPref(setting.pref! as GlobalPref, (e.target as HTMLSelectElement).value, 'ui');
-            this.onGlobalSettingChanged(e);
-        });
-
-        setting.options = {};
-        for (const regionName in STATES.serverRegions) {
-            const region = STATES.serverRegions[regionName];
-            let value = regionName;
-
-            let label = `${region.shortName} - ${region.displayName ?? regionName}`;
-            // The Android build keeps its original emoji/text selector.
-            // The image-backed flag UI is only necessary on desktop, where
-            // Windows can render country emoji as plain letters.
-            let desktopLabel = isAndroidAppBuild
-                ? label
-                : `${region.flag ? region.shortName.replace(region.flag, '').trim() : region.shortName} - ${region.displayName ?? regionName}`;
-            if (region.isDefault) {
-                label += ` (${t('default')})`;
-                desktopLabel += ` (${t('default')})`;
-                value = 'default';
-
-                if (selectedValue === regionName) {
-                    selectedValue = 'default';
-                }
-            }
-
-            setting.options[value] = label;
-
-            // Older cached offering responses can have the emoji but not the
-            // derived ISO code. Derive it here as well so the desktop flag
-            // picker never falls back to the native text-only menu.
-            const flagCode = region.flagCode || [...(region.flag || '')]
-                .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
-                .join('')
-                .toLowerCase();
-
-            const $option = CE('option', {
-                value,
-                _dataset: {
-                    label: desktopLabel,
-                    flag: isAndroidAppBuild ? '' : (region.flag || ''),
-                    flagCode: isAndroidAppBuild ? '' : flagCode,
-                },
-            }, label);
-            const continent = continents[region.contintent];
-            if (!continent.children) {
-                continent.children = [];
-            }
-            continent.children.push($option);
-        }
-
-        const fragment = document.createDocumentFragment();
-        let key: keyof typeof continents;
-        for (key in continents) {
-            const continent = continents[key];
-            if (!continent.children) {
-                continue;
-            }
-
-            fragment.appendChild(CE('optgroup', {
-                label: continent.label,
-            }, ...continent.children));
-        }
-
-        $control.appendChild(fragment);
-        $control.disabled = Object.keys(STATES.serverRegions).length === 0;
-
-        // Select preferred region
-        $control.value = selectedValue;
-
-        return $control;
+        return this.renderFlagServerSetting(setting);
     }
 
     /**
@@ -959,7 +851,7 @@ export class SettingsDialog extends NavigationDialog {
      * so this is a standalone menu that writes the same preference as the
      * Android selector.
      */
-    private renderDesktopServerSetting(setting: SettingTabSectionItem): HTMLElement {
+    private renderFlagServerSetting(setting: SettingTabSectionItem): HTMLElement {
         type RegionOption = {
             value: string;
             label: string;
