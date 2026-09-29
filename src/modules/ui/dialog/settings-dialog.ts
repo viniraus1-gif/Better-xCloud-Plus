@@ -244,6 +244,20 @@ export class SettingsDialog extends NavigationDialog {
         label: t('other'),
         items: [
             GlobalPref.BLOCK_TRACKING,
+            ($parent => {
+                $parent.appendChild(createSettingRow(
+                    t('show-tutorial-again'),
+                    createButton({
+                        label: t('tutorial-start'),
+                        icon: BxIcon.REFRESH,
+                        style: ButtonStyle.FROSTED | ButtonStyle.FOCUSABLE | ButtonStyle.NORMAL_CASE,
+                        onClick: () => {
+                            this.hide();
+                            BxEvent.dispatch(window, BxEvent.SHOW_WELCOME_TUTORIAL);
+                        },
+                    }),
+                ));
+            }),
         ],
     }, isFullVersion() && {
         group: 'advanced',

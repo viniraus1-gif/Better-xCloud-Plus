@@ -4,6 +4,7 @@ import { SettingsDialog } from "@/modules/ui/dialog/settings-dialog";
 import { t } from "@/utils/translation";
 import { ButtonStyle, CE, createButton } from "@/utils/html";
 import { PrompFont } from "@/enums/prompt-font";
+import { BxEvent } from "@/utils/bx-event";
 
 /** A small first-visit guide for the web version. It is intentionally not a
  * setting: completing or dismissing it records the choice in local storage. */
@@ -11,8 +12,17 @@ export class WelcomeTutorial {
     // Version the completion marker so this expanded guided tour is shown once
     // even to people who completed the earlier, text-only introduction.
     private static readonly STORAGE_VALUE = '12';
+    private static replayListenerRegistered = false;
 
     static setup() {
+        if (!WelcomeTutorial.replayListenerRegistered) {
+            WelcomeTutorial.replayListenerRegistered = true;
+            window.addEventListener(BxEvent.SHOW_WELCOME_TUTORIAL, () => {
+                WelcomeTutorial.clearHighlightAndFocus();
+                window.setTimeout(() => WelcomeTutorial.render(), 250);
+            });
+        }
+
         if (window.localStorage.getItem(StorageKey.TUTORIAL_DISMISSED) === WelcomeTutorial.STORAGE_VALUE) {
             return;
         }
@@ -94,6 +104,7 @@ export class WelcomeTutorial {
             $overlay.classList.toggle('bx-welcome-tutorial-at-corner', shouldShowMenu);
 
             if (!shouldShowMenu) {
+                WelcomeTutorial.clearHighlightAndFocus();
                 if (settingsShown) {
                     settingsShown = false;
                     WelcomeTutorial.hideSettingsWithAnimation();
@@ -207,10 +218,20 @@ export class WelcomeTutorial {
         window.setTimeout(() => SettingsDialog.getInstance().hide(), 220);
     }
 
+    private static clearHighlightAndFocus() {
+        document.querySelectorAll('.bx-tutorial-highlight')
+            .forEach($element => $element.classList.remove('bx-tutorial-highlight'));
+
+        const $activeElement = document.activeElement;
+        if ($activeElement instanceof HTMLElement && $activeElement.closest('.bx-settings-dialog')) {
+            $activeElement.blur();
+        }
+    }
+
     private static dismiss($overlay: HTMLElement, $backdrop: HTMLElement) {
         window.localStorage.setItem(StorageKey.TUTORIAL_DISMISSED, WelcomeTutorial.STORAGE_VALUE);
         document.body.classList.remove('bx-welcome-tutorial-active');
-        document.querySelectorAll('.bx-tutorial-highlight').forEach($element => $element.classList.remove('bx-tutorial-highlight'));
+        WelcomeTutorial.clearHighlightAndFocus();
         $overlay.classList.add('bx-welcome-tutorial-closing');
         $backdrop.classList.add('bx-welcome-tutorial-closing');
         window.setTimeout(() => {

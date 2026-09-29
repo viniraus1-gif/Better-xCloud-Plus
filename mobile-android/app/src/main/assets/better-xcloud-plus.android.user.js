@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.10
+// @version      1.0.11
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.10", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.11", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -256,7 +256,7 @@ function deepClone(obj) {
 }
 var BxEvent;
 ((BxEvent) => {
- BxEvent.POPSTATE = "bx-popstate", BxEvent.OPEN_SETTINGS_MENU = "bx-open-settings-menu", BxEvent.STREAM_SESSION_READY = "bx-stream-session-ready", BxEvent.CUSTOM_TOUCH_LAYOUTS_LOADED = "bx-custom-touch-layouts-loaded", BxEvent.TOUCH_LAYOUT_MANAGER_READY = "bx-touch-layout-manager-ready", BxEvent.REMOTE_PLAY_READY = "bx-remote-play-ready", BxEvent.REMOTE_PLAY_FAILED = "bx-remote-play-failed", BxEvent.CAPTURE_SCREENSHOT = "bx-capture-screenshot", BxEvent.POINTER_LOCK_REQUESTED = "bx-pointer-lock-requested", BxEvent.POINTER_LOCK_EXITED = "bx-pointer-lock-exited", BxEvent.NAVIGATION_FOCUS_CHANGED = "bx-nav-focus-changed", BxEvent.XCLOUD_GUIDE_MENU_SHOWN = "bx-xcloud-guide-menu-shown", BxEvent.XCLOUD_POLLING_MODE_CHANGED = "bx-xcloud-polling-mode-changed", BxEvent.XCLOUD_RENDERING_COMPONENT = "bx-xcloud-rendering-component", BxEvent.XCLOUD_ROUTER_HISTORY_READY = "bx-xcloud-router-history-ready";
+ BxEvent.POPSTATE = "bx-popstate", BxEvent.OPEN_SETTINGS_MENU = "bx-open-settings-menu", BxEvent.SHOW_WELCOME_TUTORIAL = "bx-show-welcome-tutorial", BxEvent.STREAM_SESSION_READY = "bx-stream-session-ready", BxEvent.CUSTOM_TOUCH_LAYOUTS_LOADED = "bx-custom-touch-layouts-loaded", BxEvent.TOUCH_LAYOUT_MANAGER_READY = "bx-touch-layout-manager-ready", BxEvent.REMOTE_PLAY_READY = "bx-remote-play-ready", BxEvent.REMOTE_PLAY_FAILED = "bx-remote-play-failed", BxEvent.CAPTURE_SCREENSHOT = "bx-capture-screenshot", BxEvent.POINTER_LOCK_REQUESTED = "bx-pointer-lock-requested", BxEvent.POINTER_LOCK_EXITED = "bx-pointer-lock-exited", BxEvent.NAVIGATION_FOCUS_CHANGED = "bx-nav-focus-changed", BxEvent.XCLOUD_GUIDE_MENU_SHOWN = "bx-xcloud-guide-menu-shown", BxEvent.XCLOUD_POLLING_MODE_CHANGED = "bx-xcloud-polling-mode-changed", BxEvent.XCLOUD_RENDERING_COMPONENT = "bx-xcloud-rendering-component", BxEvent.XCLOUD_ROUTER_HISTORY_READY = "bx-xcloud-router-history-ready";
  function dispatch(target, eventName, data) {
   if (!target) return;
   if (!eventName) {
@@ -973,6 +973,7 @@ var SUPPORTED_LANGUAGES = {
  "tutorial-back": "Back",
  "tutorial-continue": "Continue",
  "tutorial-start": "Start",
+ "show-tutorial-again": "View tutorial again",
  wallpaper: "Wallpaper",
  webgl2: "WebGL2",
  webgpu: "WebGPU",
@@ -1036,6 +1037,7 @@ var SUPPORTED_LANGUAGES = {
   "tutorial-back": "Voltar",
   "tutorial-continue": "Continuar",
   "tutorial-start": "Começar",
+  "show-tutorial-again": "Ver o tutorial novamente",
   "pc-only-not-supported-on-mobile": "Exclusivo de PC — não suportado no celular.",
   "pc-only": "Exclusivo de PC",
   "skip-session-rating": "Pular avaliação após a sessão",
@@ -8650,7 +8652,17 @@ class SettingsDialog extends NavigationDialog {
   group: "other",
   label: t("other"),
   items: [
-   "block.tracking"
+   "block.tracking",
+   ($parent) => {
+    $parent.appendChild(createSettingRow(t("show-tutorial-again"), createButton({
+     label: t("tutorial-start"),
+     icon: BxIcon.REFRESH,
+     style: 16 | 64 | 4096,
+     onClick: () => {
+      this.hide(), BxEvent.dispatch(window, BxEvent.SHOW_WELCOME_TUTORIAL);
+     }
+    })));
+   }
   ]
  }, {
   group: "advanced",
@@ -12063,7 +12075,11 @@ class CloudKeepAlive {
 }
 class WelcomeTutorial {
  static STORAGE_VALUE = "12";
+ static replayListenerRegistered = !1;
  static setup() {
+  if (!WelcomeTutorial.replayListenerRegistered) WelcomeTutorial.replayListenerRegistered = !0, window.addEventListener(BxEvent.SHOW_WELCOME_TUTORIAL, () => {
+    WelcomeTutorial.clearHighlightAndFocus(), window.setTimeout(() => WelcomeTutorial.render(), 250);
+   });
   if (window.localStorage.getItem("BetterXcloud.Tutorial.Dismissed") === WelcomeTutorial.STORAGE_VALUE) return;
   let show = () => window.setTimeout(() => WelcomeTutorial.render(), 350);
   if (document.body) show();
@@ -12101,7 +12117,7 @@ class WelcomeTutorial {
    }))), $back.toggleAttribute("disabled", step === 0), $continue.querySelector("span").textContent = t(step === steps.length - 1 ? "tutorial-start" : "tutorial-continue");
    let shouldShowMenu = currentStep.showMenu !== !1;
    if ($overlay.classList.toggle("bx-welcome-tutorial-at-corner", shouldShowMenu), !shouldShowMenu) {
-    if (settingsShown) settingsShown = !1, WelcomeTutorial.hideSettingsWithAnimation(), window.setTimeout(() => document.body.classList.remove("bx-welcome-tutorial-active"), 230);
+    if (WelcomeTutorial.clearHighlightAndFocus(), settingsShown) settingsShown = !1, WelcomeTutorial.hideSettingsWithAnimation(), window.setTimeout(() => document.body.classList.remove("bx-welcome-tutorial-active"), 230);
     else document.body.classList.remove("bx-welcome-tutorial-active");
     return;
    }
@@ -12160,8 +12176,13 @@ class WelcomeTutorial {
   }
   $dialog.classList.add("bx-settings-menu-closing"), window.setTimeout(() => SettingsDialog.getInstance().hide(), 220);
  }
+ static clearHighlightAndFocus() {
+  document.querySelectorAll(".bx-tutorial-highlight").forEach(($element) => $element.classList.remove("bx-tutorial-highlight"));
+  let $activeElement = document.activeElement;
+  if ($activeElement instanceof HTMLElement && $activeElement.closest(".bx-settings-dialog")) $activeElement.blur();
+ }
  static dismiss($overlay, $backdrop) {
-  window.localStorage.setItem("BetterXcloud.Tutorial.Dismissed", WelcomeTutorial.STORAGE_VALUE), document.body.classList.remove("bx-welcome-tutorial-active"), document.querySelectorAll(".bx-tutorial-highlight").forEach(($element) => $element.classList.remove("bx-tutorial-highlight")), $overlay.classList.add("bx-welcome-tutorial-closing"), $backdrop.classList.add("bx-welcome-tutorial-closing"), window.setTimeout(() => {
+  window.localStorage.setItem("BetterXcloud.Tutorial.Dismissed", WelcomeTutorial.STORAGE_VALUE), document.body.classList.remove("bx-welcome-tutorial-active"), WelcomeTutorial.clearHighlightAndFocus(), $overlay.classList.add("bx-welcome-tutorial-closing"), $backdrop.classList.add("bx-welcome-tutorial-closing"), window.setTimeout(() => {
    $overlay.remove(), $backdrop.remove();
   }, 160);
  }

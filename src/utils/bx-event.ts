@@ -6,6 +6,7 @@ import { BX_FLAGS } from "./bx-flags";
 export namespace BxEvent {
     export const POPSTATE = 'bx-popstate';
     export const OPEN_SETTINGS_MENU = 'bx-open-settings-menu';
+    export const SHOW_WELCOME_TUTORIAL = 'bx-show-welcome-tutorial';
 
     // export const STREAM_EVENT_TARGET_READY = 'bx-stream-event-target-ready';
     // Inside patch
