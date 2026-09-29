@@ -842,6 +842,10 @@ export class SettingsDialog extends NavigationDialog {
     }
 
     private renderServerSetting(setting: SettingTabSectionItem): HTMLElement {
+        if (!isAndroidAppBuild) {
+            return this.renderDesktopServerSetting(setting);
+        }
+
         let selectedValue = getGlobalPref(GlobalPref.SERVER_REGION);
 
         const continents: Record<ServerContinent, {
@@ -946,6 +950,135 @@ export class SettingsDialog extends NavigationDialog {
         // Select preferred region
         $control.value = selectedValue;
 
+        return $control;
+    }
+
+    /**
+     * The desktop server picker deliberately does not contain a native
+     * <select>. Windows native option popups cannot render images reliably,
+     * so this is a standalone menu that writes the same preference as the
+     * Android selector.
+     */
+    private renderDesktopServerSetting(setting: SettingTabSectionItem): HTMLElement {
+        type RegionOption = {
+            value: string;
+            label: string;
+            flagCode: string;
+            continent: ServerContinent;
+        };
+
+        let selectedValue = getGlobalPref(GlobalPref.SERVER_REGION);
+        const continents: Record<ServerContinent, { label: string; children: RegionOption[] }> = {
+            'america-north': { label: t('continent-north-america'), children: [] },
+            'america-south': { label: t('continent-south-america'), children: [] },
+            asia: { label: t('continent-asia'), children: [] },
+            australia: { label: t('continent-australia'), children: [] },
+            europe: { label: t('continent-europe'), children: [] },
+            other: { label: t('other'), children: [] },
+        };
+        const $control = CE('div', {
+            class: 'bx-server-region-picker',
+            id: `bx_setting_${escapeCssSelector(setting.pref!)}`,
+        });
+        const $trigger = CE('button', {
+            class: 'bx-server-region-picker-trigger bx-focusable',
+            type: 'button',
+            ariaExpanded: 'false',
+        }) as HTMLButtonElement;
+        const $menu = CE('div', {
+            class: 'bx-server-region-picker-menu',
+            hidden: true,
+        });
+
+        setting.options = {};
+        for (const regionName in STATES.serverRegions) {
+            const region = STATES.serverRegions[regionName];
+            let value = regionName;
+            let label = `${region.shortName.replace(region.flag || '', '').trim()} - ${region.displayName ?? regionName}`;
+            if (region.isDefault) {
+                label += ` (${t('default')})`;
+                value = 'default';
+                if (selectedValue === regionName) {
+                    selectedValue = value;
+                }
+            }
+
+            const flagCode = region.flagCode || [...(region.flag || '')]
+                .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
+                .join('')
+                .toLowerCase();
+            const option: RegionOption = {
+                value,
+                label,
+                flagCode,
+                continent: region.contintent,
+            };
+            setting.options[value] = label;
+            (continents[option.continent] || continents.other).children.push(option);
+        }
+
+        const selectedOption = () => Object.values(continents)
+            .flatMap(continent => continent.children)
+            .find(option => option.value === selectedValue);
+        const updateTrigger = () => {
+            const option = selectedOption();
+            $trigger.replaceChildren(
+                option?.flagCode ? CE('img', {
+                    class: 'bx-select-flag-image',
+                    src: `https://flagcdn.com/w40/${option.flagCode}.png`,
+                    alt: '',
+                }) : '',
+                CE('span', false, option?.label || t('default')),
+                CE('span', { class: 'bx-server-region-picker-arrow' }, '▾'),
+            );
+        };
+        const closeMenu = () => {
+            $menu.hidden = true;
+            $trigger.setAttribute('aria-expanded', 'false');
+        };
+        const openMenu = () => {
+            $menu.hidden = false;
+            $trigger.setAttribute('aria-expanded', 'true');
+        };
+
+        for (const continent of Object.values(continents)) {
+            if (!continent.children.length) continue;
+            $menu.appendChild(CE('div', { class: 'bx-server-region-picker-group' }, continent.label));
+            for (const option of continent.children) {
+                const $item = CE('button', {
+                    class: 'bx-server-region-picker-option',
+                    type: 'button',
+                    _dataset: { selected: option.value === selectedValue },
+                },
+                    option.flagCode ? CE('img', {
+                        class: 'bx-select-flag-image',
+                        src: `https://flagcdn.com/w40/${option.flagCode}.png`,
+                        alt: '',
+                    }) : '',
+                    CE('span', false, option.label),
+                ) as HTMLButtonElement;
+                $item.addEventListener('click', () => {
+                    selectedValue = option.value;
+                    setGlobalPref(setting.pref! as GlobalPref, option.value, 'ui');
+                    $menu.querySelectorAll<HTMLElement>('[data-selected]').forEach($element => delete $element.dataset.selected);
+                    $item.dataset.selected = 'true';
+                    updateTrigger();
+                    closeMenu();
+                    $control.dispatchEvent(new Event('input'));
+                });
+                $menu.appendChild($item);
+            }
+        }
+
+        $trigger.addEventListener('click', () => $menu.hidden ? openMenu() : closeMenu());
+        document.addEventListener('pointerdown', event => {
+            if (event.target instanceof Node && !$control.contains(event.target)) {
+                closeMenu();
+            }
+        });
+        $control.addEventListener('input', this.onGlobalSettingChanged);
+        $control.append($trigger, $menu);
+        updateTrigger();
         return $control;
     }
 
