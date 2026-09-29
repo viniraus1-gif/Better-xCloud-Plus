@@ -226,6 +226,15 @@ export class BxSelectElement extends HTMLSelectElement {
             $btnNext || '',
         );
 
+        // Do not leave the backing select in the document for desktop server
+        // regions. Chromium can still open its native option popup from an
+        // invisible control in a few controller-navigation paths. The select
+        // remains alive as the state holder, while the only visible control
+        // is our image-capable dropdown.
+        if (hasFlagOptions) {
+            $select.remove();
+        }
+
         BxSelectElement.resetIndicators.call(self);
         BxSelectElement.render.call(self);
 
