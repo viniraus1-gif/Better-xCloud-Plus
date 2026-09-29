@@ -81,6 +81,7 @@ export class BxSelectElement extends HTMLSelectElement {
             // This must win over all responsive and controller-mode rules.
             // A visible native <select> can never render image flags.
             for (const [property, value] of [
+                ['display', 'none'],
                 ['position', 'absolute'],
                 ['top', '-9999px'],
                 ['left', '-9999px'],
