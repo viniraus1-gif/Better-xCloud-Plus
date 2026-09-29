@@ -443,20 +443,22 @@ html[data-active-input=keyboard] {
 .bx-server-region-picker-menu {
     position: absolute;
     z-index: 2147483647;
-    top: calc(100% + 3px);
+    top: auto;
+    bottom: calc(100% + 3px);
     left: 0;
     right: 0;
     max-height: 360px;
     overflow-y: auto;
     padding: 4px 0;
-    border: 1px solid #3f3f3f;
-    background: #393939;
-    box-shadow: 0 8px 18px #000c;
+    border: 1px solid #767676;
+    background: #fff;
+    color: #000;
+    box-shadow: 0 -8px 18px #0008;
 }
 
 .bx-server-region-picker-group {
     padding: 5px 10px 2px;
-    color: #fff;
+    color: #000;
     font-size: 12px;
     font-weight: bold;
 }
@@ -469,12 +471,13 @@ html[data-active-input=keyboard] {
     padding: 4px 10px;
     border: 0;
     background: transparent;
-    color: #fff;
+    color: #000;
     text-align: left;
     cursor: pointer;
 
     &:hover, &:focus, &[data-selected=true] {
-        background: #176fa9;
+        background: #196fd0;
+        color: #fff;
     }
 }
 
