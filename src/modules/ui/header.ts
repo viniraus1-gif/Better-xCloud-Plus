@@ -97,15 +97,19 @@ export class HeaderSection {
                 // header button unchanged.
                 const regionName = getPreferredServerRegion();
                 const region = regionName ? STATES.serverRegions[regionName] : undefined;
+                const flagCode = region?.flagCode || [...(region?.flag || '')]
+                    .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
+                    .join('')
+                    .toLowerCase();
                 const $serverLabel = $btnSettings.querySelector('span')!;
                 const serverName = (isAndroidAppBuild ? '' : region?.shortName.replace(region.flag || '', '').trim())
                     || getPreferredServerRegion(true)
                     || t('better-xcloud');
 
                 $serverLabel.replaceChildren(
-                    !isAndroidAppBuild && region?.flagCode ? CE('img', {
+                    !isAndroidAppBuild && flagCode ? CE('img', {
                         class: 'bx-server-menu-flag',
-                        src: `https://flagcdn.com/w40/${region.flagCode}.png`,
+                        src: `https://flagcdn.com/w40/${flagCode}.png`,
                         alt: '',
                     }) : '',
                     document.createTextNode(serverName),

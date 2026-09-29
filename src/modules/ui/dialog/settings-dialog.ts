@@ -903,12 +903,20 @@ export class SettingsDialog extends NavigationDialog {
 
             setting.options[value] = label;
 
+            // Older cached offering responses can have the emoji but not the
+            // derived ISO code. Derive it here as well so the desktop flag
+            // picker never falls back to the native text-only menu.
+            const flagCode = region.flagCode || [...(region.flag || '')]
+                .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
+                .join('')
+                .toLowerCase();
+
             const $option = CE('option', {
                 value,
                 _dataset: {
                     label: desktopLabel,
                     flag: isAndroidAppBuild ? '' : (region.flag || ''),
-                    flagCode: isAndroidAppBuild ? '' : (region.flagCode || ''),
+                    flagCode: isAndroidAppBuild ? '' : flagCode,
                 },
             }, label);
             const continent = continents[region.contintent];

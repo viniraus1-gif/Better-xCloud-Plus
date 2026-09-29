@@ -157,6 +157,24 @@ export class BxSelectElement extends HTMLSelectElement {
                 self.$label = CE('label', { for: $select.id + '_checkbox' }, ''),
                 self.$indicators,
             );
+
+            // Controller-friendly selects keep the native control offscreen.
+            // Make the visible value panel open the same flagged menu, instead
+            // of relying on a hidden <select> to receive the pointer event.
+            if (hasFlagOptions && isControllerFriendly) {
+                $content.tabIndex = 0;
+                $content.setAttribute('role', 'button');
+                $content.addEventListener('pointerdown', e => {
+                    e.preventDefault();
+                    BxSelectElement.toggleFlagDropdown.call(self, $content as HTMLElement);
+                });
+                $content.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        BxSelectElement.toggleFlagDropdown.call(self, $content as HTMLElement);
+                    }
+                });
+            }
         }
 
         $select.addEventListener('input', BxSelectElement.render.bind(self));
