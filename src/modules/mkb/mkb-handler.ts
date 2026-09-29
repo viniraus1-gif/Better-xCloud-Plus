@@ -349,8 +349,8 @@ export class EmulatedMkbHandler extends MkbHandler {
                 DPadUp: button(12), DPadDown: button(13),
                 DPadLeft: button(14), DPadRight: button(15),
                 Nexus: button(16),
-                LeftThumbXAxis: axis(0), LeftThumbYAxis: axis(1),
-                RightThumbXAxis: axis(2), RightThumbYAxis: axis(3),
+                LeftThumbXAxis: axis(0), LeftThumbYAxis: -axis(1),
+                RightThumbXAxis: axis(2), RightThumbYAxis: -axis(3),
                 Dirty: true,
             }),
         };
