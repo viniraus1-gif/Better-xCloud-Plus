@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.8
+// @version      1.0.9
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.8", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.9", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -9096,6 +9096,7 @@ class SettingsDialog extends NavigationDialog {
     if (label += ` (${t("default")})`, value = "default", selectedValue === regionName) selectedValue = value;
    }
    let flagCode = region.flagCode || [...region.flag || ""].map((char) => String.fromCharCode(char.codePointAt(0) - 127462 + 65)).join("").toLowerCase(), option = {
+    regionName,
     value,
     label,
     flagCode,
@@ -9129,7 +9130,9 @@ class SettingsDialog extends NavigationDialog {
      alt: ""
     }) : "", CE("span", !1, option.label));
     $item.addEventListener("click", () => {
-     selectedValue = option.value, setGlobalPref(setting.pref, option.value, "ui"), $menu.querySelectorAll("[data-selected]").forEach(($element) => delete $element.dataset.selected), $item.dataset.selected = "true", updateTrigger(), closeMenu(), $control.dispatchEvent(new Event("input"));
+     selectedValue = option.value, setGlobalPref(setting.pref, option.value, "ui"), $menu.querySelectorAll("[data-selected]").forEach(($element) => delete $element.dataset.selected), $item.dataset.selected = "true", updateTrigger(), closeMenu(), $control.dispatchEvent(new Event("input")), window.dispatchEvent(new CustomEvent("bx-server-region-changed", {
+      detail: { regionName: option.regionName }
+     }));
     }), $menu.appendChild($item);
    }
   }
@@ -10131,16 +10134,11 @@ class HeaderSection {
    title: t("fullscreen"),
    style: 16 | 32 | 64 | 4096,
    onClick: this.onFullscreenClick
-  }), document.addEventListener("fullscreenchange", this.syncFullscreenButton), window.addEventListener(BxEvent.POPSTATE, () => window.setTimeout(this.updateFullscreenButton)), window.addEventListener(BxEvent.POPSTATE, this.scheduleHeaderRestore), BxEventBus.Stream.on("state.stopped", this.scheduleHeaderRestore), this.$buttonsWrapper = CE("div", !1, !getGlobalPref("block.features").includes("remote-play") ? this.$btnRemotePlay : null, this.$btnSettings), this.observeHeaderReplacement(), window.setTimeout(() => this.decorateLocaleButtons(), 500), BxEventBus.Script.on("xcloud.server", ({ status }) => {
-   if (status === "ready") {
-    STATES.isSignedIn = !0;
-    let regionName = getPreferredServerRegion(), region = regionName ? STATES.serverRegions[regionName] : void 0, flagCode = region?.flagCode || [...region?.flag || ""].map((char) => String.fromCharCode(char.codePointAt(0) - 127462 + 65)).join("").toLowerCase(), $serverLabel = $btnSettings.querySelector("span"), serverName = (isAndroidAppBuild ? "" : region?.shortName.replace(region.flag || "", "").trim()) || getPreferredServerRegion(!0) || t("better-xcloud");
-    $serverLabel.replaceChildren(!isAndroidAppBuild && flagCode ? CE("img", {
-     class: "bx-server-menu-flag",
-     src: `https://flagcdn.com/w40/${flagCode}.png`,
-     alt: ""
-    }) : "", document.createTextNode(serverName));
-   } else if (status === "error") Toast.show(t("server-list-error"), "❌", { instant: !0 });
+  }), document.addEventListener("fullscreenchange", this.syncFullscreenButton), window.addEventListener(BxEvent.POPSTATE, () => window.setTimeout(this.updateFullscreenButton)), window.addEventListener(BxEvent.POPSTATE, this.scheduleHeaderRestore), BxEventBus.Stream.on("state.stopped", this.scheduleHeaderRestore), this.$buttonsWrapper = CE("div", !1, !getGlobalPref("block.features").includes("remote-play") ? this.$btnRemotePlay : null, this.$btnSettings), this.observeHeaderReplacement(), window.addEventListener("bx-server-region-changed", () => {
+   this.updateServerButton(), this.decorateLocaleButtons();
+  }), window.setTimeout(() => this.decorateLocaleButtons(), 500), BxEventBus.Script.on("xcloud.server", ({ status }) => {
+   if (status === "ready") STATES.isSignedIn = !0, this.updateServerButton();
+   else if (status === "error") Toast.show(t("server-list-error"), "❌", { instant: !0 });
    else if (status === "unavailable") {
     if (STATES.supportedRegion = !1, document.querySelector("div[class^=UnsupportedMarketPage-module__container]")) SettingsDialog.getInstance().show();
    }
@@ -10158,10 +10156,21 @@ class HeaderSection {
   this.updateFullscreenButton();
  };
  decorateLocaleButtons() {
-  if (isAndroidAppBuild) return;
   document.querySelectorAll("button").forEach(($button) => {
    if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || "")) this.addLocaleFlag($button);
   });
+ }
+ getSelectedServerFlagCode() {
+  let regionName = getPreferredServerRegion(), region = regionName ? STATES.serverRegions[regionName] : void 0, code = region?.flagCode || [...region?.flag || ""].map((char) => String.fromCharCode(char.codePointAt(0) - 127462 + 65)).join("").toLowerCase();
+  return code.length === 2 ? code : "";
+ }
+ updateServerButton() {
+  let regionName = getPreferredServerRegion(), region = regionName ? STATES.serverRegions[regionName] : void 0, flagCode = this.getSelectedServerFlagCode(), serverName = region?.shortName.replace(region.flag || "", "").trim() || getPreferredServerRegion(!0) || t("better-xcloud");
+  this.$btnSettings.querySelector("span").replaceChildren(flagCode ? CE("img", {
+   class: "bx-server-menu-flag",
+   src: `https://flagcdn.com/w40/${flagCode}.png`,
+   alt: ""
+  }) : "", document.createTextNode(serverName));
  }
  scheduleHeaderRestore = () => {
   if (this.headerRestoreTimers.forEach((timer) => clearTimeout(timer)), this.headerRestoreInterval !== null) clearInterval(this.headerRestoreInterval);
@@ -10217,13 +10226,15 @@ class HeaderSection {
   })?.classList.add("bx-hide-in-browser-fullscreen"), this.syncFullscreenButton();
  };
  addLocaleFlag($button) {
-  let countryCode = $button.textContent?.trim().match(/^([a-z]{2})\s/i)?.[1]?.toLowerCase();
-  if (!countryCode || $button.querySelector(".bx-locale-flag")) return;
-  $button.prepend(CE("img", {
-   class: "bx-locale-flag",
-   src: `https://flagcdn.com/w40/${countryCode}.png`,
-   alt: ""
-  }));
+  let countryCode = this.getSelectedServerFlagCode() || $button.textContent?.trim().match(/^([a-z]{2})\s/i)?.[1]?.toLowerCase();
+  if (!countryCode) return;
+  let $existingFlag = $button.querySelector(".bx-locale-flag");
+  if ($existingFlag) $existingFlag.src = `https://flagcdn.com/w40/${countryCode}.png`;
+  else $button.prepend(CE("img", {
+    class: "bx-locale-flag",
+    src: `https://flagcdn.com/w40/${countryCode}.png`,
+    alt: ""
+   }));
  }
  showRemotePlayButton() {
   this.$btnRemotePlay?.classList.remove("bx-gone");

@@ -853,6 +853,7 @@ export class SettingsDialog extends NavigationDialog {
      */
     private renderFlagServerSetting(setting: SettingTabSectionItem): HTMLElement {
         type RegionOption = {
+            regionName: string;
             value: string;
             label: string;
             flagCode: string;
@@ -900,6 +901,7 @@ export class SettingsDialog extends NavigationDialog {
                 .join('')
                 .toLowerCase();
             const option: RegionOption = {
+                regionName,
                 value,
                 label,
                 flagCode,
@@ -957,6 +959,9 @@ export class SettingsDialog extends NavigationDialog {
                     updateTrigger();
                     closeMenu();
                     $control.dispatchEvent(new Event('input'));
+                    window.dispatchEvent(new CustomEvent('bx-server-region-changed', {
+                        detail: { regionName: option.regionName },
+                    }));
                 });
                 $menu.appendChild($item);
             }

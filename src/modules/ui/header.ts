@@ -14,7 +14,6 @@ import { BxEventBus } from "@/utils/bx-event-bus";
 import { BlockFeature } from "@/enums/pref-values";
 import { Toast } from "@/utils/toast";
 import { BxEvent } from "@/utils/bx-event";
-import { isAndroidAppBuild } from "@/build-config";
 
 // Saved while the module loads, before the Remote Play compatibility patch
 // replaces the Fullscreen API.
@@ -87,6 +86,10 @@ export class HeaderSection {
             this.$btnSettings,
         );
         this.observeHeaderReplacement();
+        window.addEventListener('bx-server-region-changed', () => {
+            this.updateServerButton();
+            this.decorateLocaleButtons();
+        });
         // The Xbox market button can mount before, after, or outside the
         // header we use to position Better xCloud controls. Scan once after
         // that mount so its flag does not depend on a class-name match.
@@ -96,28 +99,7 @@ export class HeaderSection {
             if (status === 'ready') {
                 STATES.isSignedIn = true;
 
-                // Desktop uses a real flag image because Windows can render
-                // country emoji as letters. Keep Android's previous text-only
-                // header button unchanged.
-                const regionName = getPreferredServerRegion();
-                const region = regionName ? STATES.serverRegions[regionName] : undefined;
-                const flagCode = region?.flagCode || [...(region?.flag || '')]
-                    .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
-                    .join('')
-                    .toLowerCase();
-                const $serverLabel = $btnSettings.querySelector('span')!;
-                const serverName = (isAndroidAppBuild ? '' : region?.shortName.replace(region.flag || '', '').trim())
-                    || getPreferredServerRegion(true)
-                    || t('better-xcloud');
-
-                $serverLabel.replaceChildren(
-                    !isAndroidAppBuild && flagCode ? CE('img', {
-                        class: 'bx-server-menu-flag',
-                        src: `https://flagcdn.com/w40/${flagCode}.png`,
-                        alt: '',
-                    }) : '',
-                    document.createTextNode(serverName),
-                );
+                this.updateServerButton();
             } else if (status === 'error') {
                 Toast.show(t('server-list-error'), '❌', { instant: true });
             } else if (status === 'unavailable') {
@@ -170,15 +152,40 @@ export class HeaderSection {
     }
 
     private decorateLocaleButtons() {
-        if (isAndroidAppBuild) {
-            return;
-        }
-
         document.querySelectorAll<HTMLElement>('button').forEach($button => {
             if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || '')) {
                 this.addLocaleFlag($button);
             }
         });
+    }
+
+    private getSelectedServerFlagCode(): string {
+        const regionName = getPreferredServerRegion();
+        const region = regionName ? STATES.serverRegions[regionName] : undefined;
+        const code = region?.flagCode || [...(region?.flag || '')]
+            .map(char => String.fromCharCode(char.codePointAt(0)! - 0x1F1E6 + 65))
+            .join('')
+            .toLowerCase();
+        return code.length === 2 ? code : '';
+    }
+
+    private updateServerButton() {
+        const regionName = getPreferredServerRegion();
+        const region = regionName ? STATES.serverRegions[regionName] : undefined;
+        const flagCode = this.getSelectedServerFlagCode();
+        const serverName = region?.shortName.replace(region.flag || '', '').trim()
+            || getPreferredServerRegion(true)
+            || t('better-xcloud');
+        const $serverLabel = this.$btnSettings.querySelector('span')!;
+
+        $serverLabel.replaceChildren(
+            flagCode ? CE('img', {
+                class: 'bx-server-menu-flag',
+                src: `https://flagcdn.com/w40/${flagCode}.png`,
+                alt: '',
+            }) : '',
+            document.createTextNode(serverName),
+        );
     }
 
     // xCloud removes and rebuilds its header after a stream ends. Re-attach
@@ -306,16 +313,22 @@ export class HeaderSection {
     /** Add a real flag image to Xbox's own market button (for example BR BRS).
      * Emoji flags become plain letters in some Windows font installations. */
     private addLocaleFlag($button: HTMLElement) {
-        const countryCode = $button.textContent?.trim().match(/^([a-z]{2})\s/i)?.[1]?.toLowerCase();
-        if (!countryCode || $button.querySelector('.bx-locale-flag')) {
+        const countryCode = this.getSelectedServerFlagCode()
+            || $button.textContent?.trim().match(/^([a-z]{2})\s/i)?.[1]?.toLowerCase();
+        if (!countryCode) {
             return;
         }
 
-        $button.prepend(CE('img', {
-            class: 'bx-locale-flag',
-            src: `https://flagcdn.com/w40/${countryCode}.png`,
-            alt: '',
-        }));
+        const $existingFlag = $button.querySelector<HTMLImageElement>('.bx-locale-flag');
+        if ($existingFlag) {
+            $existingFlag.src = `https://flagcdn.com/w40/${countryCode}.png`;
+        } else {
+            $button.prepend(CE('img', {
+                class: 'bx-locale-flag',
+                src: `https://flagcdn.com/w40/${countryCode}.png`,
+                alt: '',
+            }));
+        }
     }
 
     showRemotePlayButton() {
