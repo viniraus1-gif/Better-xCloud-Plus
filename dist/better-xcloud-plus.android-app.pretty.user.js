@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.17
+// @version      1.0.18
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.17", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.18", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -4552,6 +4552,8 @@ class EmulatedMkbHandler extends MkbHandler {
  mouseDataProvider;
  isPolling = !1;
  physicalGamepadPollingId = null;
+ nativeGamepadPollingRestoreId = null;
+ nativeGamepadPollingWasDisabled = null;
  physicalMenuButtonStates = new Map;
  prevWheelCode = null;
  wheelStoppedTimeoutId = null;
@@ -4619,10 +4621,11 @@ class EmulatedMkbHandler extends MkbHandler {
   this.onPhysicalGamepadChanged({ gamepad: { id: "__refresh__" } });
  }
  startPhysicalGamepadBridge() {
-  this.stopPhysicalGamepadBridge();
+  if (this.stopPhysicalGamepadBridge(), this.nativeGamepadPollingRestoreId !== null) window.cancelAnimationFrame(this.nativeGamepadPollingRestoreId), this.nativeGamepadPollingRestoreId = null;
+  this.nativeGamepadPollingWasDisabled ??= window.BX_EXPOSED.disableGamepadPolling, window.BX_EXPOSED.disableGamepadPolling = !0;
   let poll = () => {
    if (!this.enabled || !getStreamPref("localCoOp.enabled")) {
-    this.physicalGamepadPollingId = null;
+    this.stopPhysicalGamepadBridge();
     return;
    }
    let mappings = Array.from(this.nativeGetGamepads() || []).filter(($gamepad) => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID).map(($gamepad) => this.toXcloudGamepadMapping($gamepad));
@@ -4633,7 +4636,18 @@ class EmulatedMkbHandler extends MkbHandler {
  }
  stopPhysicalGamepadBridge() {
   if (this.physicalGamepadPollingId !== null) window.cancelAnimationFrame(this.physicalGamepadPollingId), this.physicalGamepadPollingId = null;
-  this.physicalMenuButtonStates.clear();
+  this.restoreNativeGamepadPollingWhenButtonsAreReleased();
+ }
+ restoreNativeGamepadPollingWhenButtonsAreReleased() {
+  if (this.nativeGamepadPollingWasDisabled === null || this.nativeGamepadPollingRestoreId !== null) return;
+  let restore = () => {
+   if (Array.from(this.nativeGetGamepads() || []).some(($gamepad) => $gamepad?.connected && ($gamepad.buttons[8]?.pressed || $gamepad.buttons[9]?.pressed))) {
+    this.nativeGamepadPollingRestoreId = window.requestAnimationFrame(restore);
+    return;
+   }
+   window.BX_EXPOSED.disableGamepadPolling = this.nativeGamepadPollingWasDisabled, this.nativeGamepadPollingWasDisabled = null, this.nativeGamepadPollingRestoreId = null, this.physicalMenuButtonStates.clear();
+  };
+  restore();
  }
  toXcloudGamepadMapping($gamepad) {
   let button = (index) => $gamepad.buttons[index]?.value || 0, axis = (index) => $gamepad.axes[index] || 0, menuButtons = this.getPhysicalMenuButtonValues($gamepad);
@@ -4667,7 +4681,10 @@ class EmulatedMkbHandler extends MkbHandler {
  getPhysicalMenuButtonValues($gamepad) {
   let now = performance.now(), viewPressed = !!$gamepad.buttons[8]?.pressed, menuPressed = !!$gamepad.buttons[9]?.pressed, state = this.physicalMenuButtonStates.get($gamepad.index);
   if (!state) state = { viewPressedAt: null, menuPressedAt: null, comboActive: !1 }, this.physicalMenuButtonStates.set($gamepad.index, state);
-  if (viewPressed && menuPressed) return state.comboActive = !0, state.viewPressedAt = null, state.menuPressedAt = null, { view: 0, menu: 0 };
+  if (viewPressed && menuPressed) {
+   if (!state.comboActive) window.BX_EXPOSED.openSettingsMenu?.();
+   return state.comboActive = !0, state.viewPressedAt = null, state.menuPressedAt = null, { view: 0, menu: 0 };
+  }
   if (state.comboActive) {
    if (!viewPressed && !menuPressed) state.comboActive = !1;
    return { view: 0, menu: 0 };

@@ -160,6 +160,8 @@ export class EmulatedMkbHandler extends MkbHandler {
     private mouseDataProvider: MouseDataProvider | undefined;
     private isPolling = false;
     private physicalGamepadPollingId: number | null = null;
+    private nativeGamepadPollingRestoreId: number | null = null;
+    private nativeGamepadPollingWasDisabled: boolean | null = null;
     private physicalMenuButtonStates = new Map<number, {
         viewPressedAt: number | null;
         menuPressedAt: number | null;
@@ -313,10 +315,19 @@ export class EmulatedMkbHandler extends MkbHandler {
      */
     private startPhysicalGamepadBridge() {
         this.stopPhysicalGamepadBridge();
+        if (this.nativeGamepadPollingRestoreId !== null) {
+            window.cancelAnimationFrame(this.nativeGamepadPollingRestoreId);
+            this.nativeGamepadPollingRestoreId = null;
+        }
+        this.nativeGamepadPollingWasDisabled ??= window.BX_EXPOSED.disableGamepadPolling;
+        // The bridge is the single source of physical-controller input while
+        // MKB local co-op is active. This prevents xCloud's original poller
+        // from receiving Start + Select behind our reserved shortcut.
+        window.BX_EXPOSED.disableGamepadPolling = true;
 
         const poll = () => {
             if (!this.enabled || !getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED)) {
-                this.physicalGamepadPollingId = null;
+                this.stopPhysicalGamepadBridge();
                 return;
             }
 
@@ -338,7 +349,30 @@ export class EmulatedMkbHandler extends MkbHandler {
             window.cancelAnimationFrame(this.physicalGamepadPollingId);
             this.physicalGamepadPollingId = null;
         }
-        this.physicalMenuButtonStates.clear();
+        this.restoreNativeGamepadPollingWhenButtonsAreReleased();
+    }
+
+    private restoreNativeGamepadPollingWhenButtonsAreReleased() {
+        if (this.nativeGamepadPollingWasDisabled === null || this.nativeGamepadPollingRestoreId !== null) {
+            return;
+        }
+
+        const restore = () => {
+            const menuButtonHeld = Array.from(this.nativeGetGamepads() || []).some($gamepad =>
+                $gamepad?.connected
+                && ($gamepad.buttons[GamepadKey.SELECT]?.pressed || $gamepad.buttons[GamepadKey.START]?.pressed));
+            if (menuButtonHeld) {
+                this.nativeGamepadPollingRestoreId = window.requestAnimationFrame(restore);
+                return;
+            }
+
+            window.BX_EXPOSED.disableGamepadPolling = this.nativeGamepadPollingWasDisabled!;
+            this.nativeGamepadPollingWasDisabled = null;
+            this.nativeGamepadPollingRestoreId = null;
+            this.physicalMenuButtonStates.clear();
+        };
+
+        restore();
     }
 
     private toXcloudGamepadMapping($gamepad: Gamepad): XcloudGamepad {
@@ -377,6 +411,9 @@ export class EmulatedMkbHandler extends MkbHandler {
         // Delay each standalone button briefly so the first part of the combo
         // never leaks into the game before the second button is pressed.
         if (viewPressed && menuPressed) {
+            if (!state.comboActive) {
+                window.BX_EXPOSED.openSettingsMenu?.();
+            }
             state.comboActive = true;
             state.viewPressedAt = null;
             state.menuPressedAt = null;
