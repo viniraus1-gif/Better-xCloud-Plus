@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.14
+// @version      1.0.15
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.14", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.15", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -4551,6 +4551,7 @@ class EmulatedMkbHandler extends MkbHandler {
  enabled = !1;
  mouseDataProvider;
  isPolling = !1;
+ physicalGamepadPollingId = null;
  prevWheelCode = null;
  wheelStoppedTimeoutId = null;
  detectMouseStoppedTimeoutId = null;
@@ -4615,6 +4616,51 @@ class EmulatedMkbHandler extends MkbHandler {
  };
  refreshLocalCoOpSlot() {
   this.onPhysicalGamepadChanged({ gamepad: { id: "__refresh__" } });
+ }
+ startPhysicalGamepadBridge() {
+  this.stopPhysicalGamepadBridge();
+  let poll = () => {
+   if (!this.enabled || !getStreamPref("localCoOp.enabled")) {
+    this.physicalGamepadPollingId = null;
+    return;
+   }
+   let mappings = Array.from(this.nativeGetGamepads() || []).filter(($gamepad) => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID).map(($gamepad) => this.toXcloudGamepadMapping($gamepad));
+   if (mappings.length) window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), mappings);
+   this.physicalGamepadPollingId = window.requestAnimationFrame(poll);
+  };
+  poll();
+ }
+ stopPhysicalGamepadBridge() {
+  if (this.physicalGamepadPollingId !== null) window.cancelAnimationFrame(this.physicalGamepadPollingId), this.physicalGamepadPollingId = null;
+ }
+ toXcloudGamepadMapping($gamepad) {
+  let button = (index) => $gamepad.buttons[index]?.value || 0, axis = (index) => $gamepad.axes[index] || 0;
+  return {
+   ...generateVirtualControllerMapping($gamepad.index, {
+    A: button(0),
+    B: button(1),
+    X: button(2),
+    Y: button(3),
+    LeftShoulder: button(4),
+    RightShoulder: button(5),
+    LeftTrigger: button(6),
+    RightTrigger: button(7),
+    View: button(8),
+    Menu: button(9),
+    LeftThumb: button(10),
+    RightThumb: button(11),
+    DPadUp: button(12),
+    DPadDown: button(13),
+    DPadLeft: button(14),
+    DPadRight: button(15),
+    Nexus: button(16),
+    LeftThumbXAxis: axis(0),
+    LeftThumbYAxis: axis(1),
+    RightThumbXAxis: axis(2),
+    RightThumbYAxis: axis(3),
+    Dirty: !0
+   })
+  };
  }
  pressButton(buttonIndex, pressed) {
   let xCloudKey = toXcloudGamepadKey(buttonIndex);
@@ -4761,7 +4807,7 @@ class EmulatedMkbHandler extends MkbHandler {
   if (!this.initialized) return;
   if (this.initialized = !1, this.isPolling = !1, this.enabled = !1, this.stop(), this.waitForMouseData(!1), document.exitPointerLock(), window.removeEventListener("keydown", this.onKeyboardEvent), window.removeEventListener("keyup", this.onKeyboardEvent), window.removeEventListener("gamepadconnected", this.onPhysicalGamepadChanged), window.removeEventListener("gamepaddisconnected", this.onPhysicalGamepadChanged), AppInterface) window.removeEventListener(BxEvent.POINTER_LOCK_REQUESTED, this), window.removeEventListener(BxEvent.POINTER_LOCK_EXITED, this);
   else document.removeEventListener("pointerlockchange", this.onPointerLockChange), document.removeEventListener("pointerlockerror", this.onPointerLockError);
-  window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged), BxEventBus.Script.off("dialog.shown", this.onDialogShown), this.mouseDataProvider?.destroy(), window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged);
+  window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged), BxEventBus.Script.off("dialog.shown", this.onDialogShown), this.mouseDataProvider?.destroy(), this.stopPhysicalGamepadBridge(), window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged);
  }
  start() {
   if (!this.enabled) this.enabled = !0, Toast.show(t("virtual-controller"), t("enabled"), { instant: !0 });
@@ -4769,10 +4815,10 @@ class EmulatedMkbHandler extends MkbHandler {
   let virtualGamepad = this.getVirtualGamepad();
   virtualGamepad.connected = !0, virtualGamepad.timestamp = performance.now(), BxEvent.dispatch(window, "gamepadconnected", {
    gamepad: virtualGamepad
-  }), window.BX_EXPOSED.stopTakRendering = !0, Toast.show(t("virtual-controller"), t("enabled"), { instant: !0 });
+  }), this.startPhysicalGamepadBridge(), window.BX_EXPOSED.stopTakRendering = !0, Toast.show(t("virtual-controller"), t("enabled"), { instant: !0 });
  }
  stop() {
-  this.enabled = !1, this.isPolling = !1, this.escKeyDownTime = -1;
+  this.enabled = !1, this.isPolling = !1, this.escKeyDownTime = -1, this.stopPhysicalGamepadBridge();
   let virtualGamepad = this.getVirtualGamepad();
   if (virtualGamepad.connected) this.resetXcloudGamepads(), virtualGamepad.connected = !1, virtualGamepad.timestamp = performance.now(), BxEvent.dispatch(window, "gamepaddisconnected", {
     gamepad: virtualGamepad

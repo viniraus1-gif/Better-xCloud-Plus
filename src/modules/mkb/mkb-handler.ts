@@ -159,6 +159,7 @@ export class EmulatedMkbHandler extends MkbHandler {
     private enabled = false;
     private mouseDataProvider: MouseDataProvider | undefined;
     private isPolling = false;
+    private physicalGamepadPollingId: number | null = null;
 
     private prevWheelCode = null;
     private wheelStoppedTimeoutId: number | null = null;
@@ -298,6 +299,61 @@ export class EmulatedMkbHandler extends MkbHandler {
 
     refreshLocalCoOpSlot() {
         this.onPhysicalGamepadChanged({ gamepad: { id: '__refresh__' } } as GamepadEvent);
+    }
+
+    /**
+     * xCloud can stop polling physical pads after the virtual keyboard pad is
+     * enabled. Send physical inputs directly as the other local-co-op player
+     * so a keyboard player never hides a connected controller.
+     */
+    private startPhysicalGamepadBridge() {
+        this.stopPhysicalGamepadBridge();
+
+        const poll = () => {
+            if (!this.enabled || !getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED)) {
+                this.physicalGamepadPollingId = null;
+                return;
+            }
+
+            const mappings = Array.from(this.nativeGetGamepads() || [])
+                .filter($gamepad => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID)
+                .map($gamepad => this.toXcloudGamepadMapping($gamepad!));
+            if (mappings.length) {
+                window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), mappings);
+            }
+
+            this.physicalGamepadPollingId = window.requestAnimationFrame(poll);
+        };
+
+        poll();
+    }
+
+    private stopPhysicalGamepadBridge() {
+        if (this.physicalGamepadPollingId !== null) {
+            window.cancelAnimationFrame(this.physicalGamepadPollingId);
+            this.physicalGamepadPollingId = null;
+        }
+    }
+
+    private toXcloudGamepadMapping($gamepad: Gamepad): XcloudGamepad {
+        const button = (index: number) => $gamepad.buttons[index]?.value || 0;
+        const axis = (index: number) => $gamepad.axes[index] || 0;
+
+        return {
+            ...generateVirtualControllerMapping($gamepad.index, {
+                A: button(0), B: button(1), X: button(2), Y: button(3),
+                LeftShoulder: button(4), RightShoulder: button(5),
+                LeftTrigger: button(6), RightTrigger: button(7),
+                View: button(8), Menu: button(9),
+                LeftThumb: button(10), RightThumb: button(11),
+                DPadUp: button(12), DPadDown: button(13),
+                DPadLeft: button(14), DPadRight: button(15),
+                Nexus: button(16),
+                LeftThumbXAxis: axis(0), LeftThumbYAxis: axis(1),
+                RightThumbXAxis: axis(2), RightThumbYAxis: axis(3),
+                Dirty: true,
+            }),
+        };
     }
 
     private pressButton(buttonIndex: GamepadKey, pressed: boolean) {
@@ -639,6 +695,7 @@ export class EmulatedMkbHandler extends MkbHandler {
         BxEventBus.Script.off('dialog.shown', this.onDialogShown);
 
         this.mouseDataProvider?.destroy();
+        this.stopPhysicalGamepadBridge();
 
         window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged);
     }
@@ -668,6 +725,7 @@ export class EmulatedMkbHandler extends MkbHandler {
         BxEvent.dispatch(window, 'gamepadconnected', {
                 gamepad: virtualGamepad,
             });
+        this.startPhysicalGamepadBridge();
 
         window.BX_EXPOSED.stopTakRendering = true;
 
@@ -678,6 +736,7 @@ export class EmulatedMkbHandler extends MkbHandler {
         this.enabled = false;
         this.isPolling = false;
         this.escKeyDownTime = -1;
+        this.stopPhysicalGamepadBridge();
 
         const virtualGamepad = this.getVirtualGamepad();
         if (virtualGamepad.connected) {
