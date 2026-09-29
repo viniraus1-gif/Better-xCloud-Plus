@@ -3,13 +3,14 @@ import { GlobalPref, StreamPref, type AnyPref } from "@/enums/pref-keys";
 import { SettingsDialog } from "@/modules/ui/dialog/settings-dialog";
 import { t } from "@/utils/translation";
 import { ButtonStyle, CE, createButton } from "@/utils/html";
+import { PrompFont } from "@/enums/prompt-font";
 
 /** A small first-visit guide for the web version. It is intentionally not a
  * setting: completing or dismissing it records the choice in local storage. */
 export class WelcomeTutorial {
     // Version the completion marker so this expanded guided tour is shown once
     // even to people who completed the earlier, text-only introduction.
-    private static readonly STORAGE_VALUE = '11';
+    private static readonly STORAGE_VALUE = '12';
 
     static setup() {
         if (window.localStorage.getItem(StorageKey.TUTORIAL_DISMISSED) === WelcomeTutorial.STORAGE_VALUE) {
@@ -37,7 +38,7 @@ export class WelcomeTutorial {
             { title: 'tutorial-image-title', body: 'tutorial-image-body', tab: 'stream', pref: StreamPref.VIDEO_SHARPNESS },
             { title: 'tutorial-vx-title', body: 'tutorial-vx-body', tab: 'vx', pref: StreamPref.VX_UPSCALE_TARGET },
             { title: 'tutorial-controls-title', body: 'tutorial-controls-body', tab: 'controller' },
-            { title: 'tutorial-controller-navigation-title', body: 'tutorial-controller-navigation-body', tab: 'controller' },
+            { title: 'tutorial-controller-navigation-title', body: 'tutorial-controller-navigation-body', tab: 'controller', controllerIcons: true },
             { title: 'tutorial-stats-title', body: 'tutorial-stats-body', tab: 'stats', pref: StreamPref.STATS_SHOW_WHEN_PLAYING },
             { title: 'tutorial-explore-title', body: 'tutorial-explore-body', showMenu: false },
         ] as const;
@@ -77,7 +78,11 @@ export class WelcomeTutorial {
         const update = () => {
             const currentStep = steps[step]!;
             $title.textContent = t(currentStep.title);
-            $body.textContent = t(currentStep.body);
+            if ('controllerIcons' in currentStep && currentStep.controllerIcons) {
+                WelcomeTutorial.renderControllerIcons($body);
+            } else {
+                $body.textContent = t(currentStep.body);
+            }
             $progress.replaceChildren(...steps.map((_, index) => CE('i', {
                 _dataset: { active: index === step, complete: index < step },
             })));
@@ -132,6 +137,38 @@ export class WelcomeTutorial {
 
         document.body.append($backdrop, $overlay);
         window.setTimeout(update, 50);
+    }
+
+    private static renderControllerIcons($body: HTMLElement) {
+        const icon = (value: PrompFont) => CE('span', {
+            class: 'bx-welcome-tutorial-gamepad-icon',
+            ariaHidden: 'true',
+        }, value);
+        const row = (icons: HTMLElement[], label: string) => CE('span', {
+            class: 'bx-welcome-tutorial-controller-row',
+        },
+            CE('span', { class: 'bx-welcome-tutorial-controller-icons' }, ...icons),
+            CE('span', false, label),
+        );
+
+        $body.replaceChildren(
+            row([
+                icon(PrompFont.START),
+                CE('span', { class: 'bx-welcome-tutorial-controller-plus' }, '+'),
+                icon(PrompFont.SELECT),
+            ], t('tutorial-controller-navigation-open-action')),
+            row([
+                icon(PrompFont.LEFT),
+                icon(PrompFont.UP),
+                icon(PrompFont.DOWN),
+                icon(PrompFont.RIGHT),
+                CE('span', { class: 'bx-welcome-tutorial-controller-or' }, '/'),
+                icon(PrompFont.LS),
+            ], t('tutorial-controller-navigation-move-action')),
+            row([icon(PrompFont.A)], t('tutorial-controller-navigation-select-action')),
+            row([icon(PrompFont.B)], t('tutorial-controller-navigation-back-action')),
+            CE('span', { class: 'bx-welcome-tutorial-controller-note' }, t('tutorial-controller-navigation-shortcuts-note')),
+        );
     }
 
     private static highlight(tab: string, pref?: AnyPref) {
