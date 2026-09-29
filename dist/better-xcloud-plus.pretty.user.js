@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.13
+// @version      1.0.14
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.13", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.14", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -4587,12 +4587,34 @@ class EmulatedMkbHandler extends MkbHandler {
   window.BX_EXPOSED.inputChannel?.sendGamepadInput(performance.now(), [this.xCloudGamepad]);
  }
  vectorLength = (x, y) => Math.sqrt(x ** 2 + y ** 2);
+ getVirtualGamepadSlot() {
+  let preferredSlot = getStreamPref("mkb.p1.slot") - 1;
+  if (!getStreamPref("localCoOp.enabled")) return preferredSlot;
+  let occupiedSlots = new Set(Array.from(this.nativeGetGamepads() || []).filter(($gamepad) => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID).map(($gamepad) => $gamepad.index));
+  if (!occupiedSlots.has(preferredSlot)) return preferredSlot;
+  for (let slot = 0;slot < 4; slot++)
+   if (!occupiedSlots.has(slot)) return slot;
+  return preferredSlot;
+ }
  resetXcloudGamepads() {
-  let index = getStreamPref("mkb.p1.slot") - 1;
+  let index = this.getVirtualGamepadSlot();
   this.xCloudGamepad = generateVirtualControllerMapping(0, {
    GamepadIndex: getStreamPref("localCoOp.enabled") ? index : 0,
    Dirty: !0
   }), this.VIRTUAL_GAMEPAD.index = index;
+ }
+ onPhysicalGamepadChanged = (event) => {
+  if (!this.enabled || !getStreamPref("localCoOp.enabled") || event.gamepad.id === VIRTUAL_GAMEPAD_ID) return;
+  let previousSlot = this.VIRTUAL_GAMEPAD.index;
+  if (previousSlot === this.getVirtualGamepadSlot()) return;
+  let virtualGamepad = this.getVirtualGamepad(), wasConnected = virtualGamepad.connected;
+  if (wasConnected) virtualGamepad.connected = !1, BxEvent.dispatch(window, "gamepaddisconnected", {
+    gamepad: { ...virtualGamepad, index: previousSlot }
+   });
+  if (this.resetXcloudGamepads(), window.BX_EXPOSED.toggleLocalCoOp(!0), wasConnected) virtualGamepad.connected = !0, virtualGamepad.timestamp = performance.now(), BxEvent.dispatch(window, "gamepadconnected", { gamepad: virtualGamepad });
+ };
+ refreshLocalCoOpSlot() {
+  this.onPhysicalGamepadChanged({ gamepad: { id: "__refresh__" } });
  }
  pressButton(buttonIndex, pressed) {
   let xCloudKey = toXcloudGamepadKey(buttonIndex);
@@ -4724,7 +4746,7 @@ class EmulatedMkbHandler extends MkbHandler {
   }
   if (this.initialized = !0, this.refreshPresetData(), this.enabled = !1, AppInterface) this.mouseDataProvider = new WebSocketMouseDataProvider(this);
   else this.mouseDataProvider = new PointerLockMouseDataProvider(this);
-  if (this.mouseDataProvider.init(), window.addEventListener("keydown", this.onKeyboardEvent), window.addEventListener("keyup", this.onKeyboardEvent), window.addEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged), BxEventBus.Script.on("dialog.shown", this.onDialogShown), AppInterface) window.addEventListener(BxEvent.POINTER_LOCK_REQUESTED, this), window.addEventListener(BxEvent.POINTER_LOCK_EXITED, this);
+  if (this.mouseDataProvider.init(), window.addEventListener("keydown", this.onKeyboardEvent), window.addEventListener("keyup", this.onKeyboardEvent), window.addEventListener("gamepadconnected", this.onPhysicalGamepadChanged), window.addEventListener("gamepaddisconnected", this.onPhysicalGamepadChanged), window.addEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged), BxEventBus.Script.on("dialog.shown", this.onDialogShown), AppInterface) window.addEventListener(BxEvent.POINTER_LOCK_REQUESTED, this), window.addEventListener(BxEvent.POINTER_LOCK_EXITED, this);
   else document.addEventListener("pointerlockchange", this.onPointerLockChange), document.addEventListener("pointerlockerror", this.onPointerLockError);
   if (MkbPopup.getInstance().reset(), AppInterface) {
    let shortcutKey = StreamSettings.findKeyboardShortcut("mkb.toggle");
@@ -4737,13 +4759,13 @@ class EmulatedMkbHandler extends MkbHandler {
  }
  destroy() {
   if (!this.initialized) return;
-  if (this.initialized = !1, this.isPolling = !1, this.enabled = !1, this.stop(), this.waitForMouseData(!1), document.exitPointerLock(), window.removeEventListener("keydown", this.onKeyboardEvent), window.removeEventListener("keyup", this.onKeyboardEvent), AppInterface) window.removeEventListener(BxEvent.POINTER_LOCK_REQUESTED, this), window.removeEventListener(BxEvent.POINTER_LOCK_EXITED, this);
+  if (this.initialized = !1, this.isPolling = !1, this.enabled = !1, this.stop(), this.waitForMouseData(!1), document.exitPointerLock(), window.removeEventListener("keydown", this.onKeyboardEvent), window.removeEventListener("keyup", this.onKeyboardEvent), window.removeEventListener("gamepadconnected", this.onPhysicalGamepadChanged), window.removeEventListener("gamepaddisconnected", this.onPhysicalGamepadChanged), AppInterface) window.removeEventListener(BxEvent.POINTER_LOCK_REQUESTED, this), window.removeEventListener(BxEvent.POINTER_LOCK_EXITED, this);
   else document.removeEventListener("pointerlockchange", this.onPointerLockChange), document.removeEventListener("pointerlockerror", this.onPointerLockError);
   window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged), BxEventBus.Script.off("dialog.shown", this.onDialogShown), this.mouseDataProvider?.destroy(), window.removeEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged);
  }
  start() {
   if (!this.enabled) this.enabled = !0, Toast.show(t("virtual-controller"), t("enabled"), { instant: !0 });
-  this.isPolling = !0, this.escKeyDownTime = -1, window.BX_EXPOSED.toggleLocalCoOp(getStreamPref("localCoOp.enabled")), this.resetXcloudGamepads(), window.navigator.getGamepads = this.patchedGetGamepads, this.waitForMouseData(!1), this.mouseDataProvider?.start();
+  this.isPolling = !0, this.escKeyDownTime = -1, this.resetXcloudGamepads(), window.navigator.getGamepads = this.patchedGetGamepads, window.BX_EXPOSED.toggleLocalCoOp(getStreamPref("localCoOp.enabled")), this.waitForMouseData(!1), this.mouseDataProvider?.start();
   let virtualGamepad = this.getVirtualGamepad();
   virtualGamepad.connected = !0, virtualGamepad.timestamp = performance.now(), BxEvent.dispatch(window, "gamepadconnected", {
    gamepad: virtualGamepad
@@ -5478,7 +5500,7 @@ class SettingsManager {
  SETTINGS = {
   "localCoOp.enabled": {
    onChange: () => {
-    BxExposed.toggleLocalCoOp(getStreamPref("localCoOp.enabled"));
+    BxExposed.toggleLocalCoOp(getStreamPref("localCoOp.enabled")), EmulatedMkbHandler.getInstance()?.refreshLocalCoOpSlot();
    }
   },
   "deviceVibration.mode": {

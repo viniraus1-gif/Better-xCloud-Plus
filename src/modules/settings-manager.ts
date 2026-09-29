@@ -43,6 +43,7 @@ export class SettingsManager {
         [StreamPref.LOCAL_CO_OP_ENABLED]: {
             onChange: () => {
                 BxExposed.toggleLocalCoOp(getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED));
+                EmulatedMkbHandler.getInstance()?.refreshLocalCoOpSlot();
             },
         },
         [StreamPref.DEVICE_VIBRATION_MODE]: {

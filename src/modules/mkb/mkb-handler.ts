@@ -232,14 +232,72 @@ export class EmulatedMkbHandler extends MkbHandler {
 
     private vectorLength = (x: number, y: number): number => Math.sqrt(x ** 2 + y ** 2);
 
+    /** Keep the virtual keyboard controller out of a physical controller's slot. */
+    private getVirtualGamepadSlot() {
+        const preferredSlot = getStreamPref(StreamPref.MKB_P1_SLOT) - 1;
+        if (!getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED)) {
+            return preferredSlot;
+        }
+
+        const occupiedSlots = new Set(Array.from(this.nativeGetGamepads() || [])
+            .filter($gamepad => $gamepad?.connected && $gamepad.id !== VIRTUAL_GAMEPAD_ID)
+            .map($gamepad => $gamepad!.index));
+        if (!occupiedSlots.has(preferredSlot)) {
+            return preferredSlot;
+        }
+
+        for (let slot = 0; slot < 4; slot++) {
+            if (!occupiedSlots.has(slot)) {
+                return slot;
+            }
+        }
+
+        return preferredSlot;
+    }
+
     resetXcloudGamepads() {
-        const index = getStreamPref(StreamPref.MKB_P1_SLOT) - 1;
+        const index = this.getVirtualGamepadSlot();
 
         this.xCloudGamepad = generateVirtualControllerMapping(0, {
             GamepadIndex: getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED) ? index : 0,
             Dirty: true,
         });
         this.VIRTUAL_GAMEPAD.index = index;
+    }
+
+    private onPhysicalGamepadChanged = (event: GamepadEvent) => {
+        if (!this.enabled
+            || !getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED)
+            || event.gamepad.id === VIRTUAL_GAMEPAD_ID) {
+            return;
+        }
+
+        const previousSlot = this.VIRTUAL_GAMEPAD.index;
+        if (previousSlot === this.getVirtualGamepadSlot()) {
+            return;
+        }
+
+        const virtualGamepad = this.getVirtualGamepad();
+        const wasConnected = virtualGamepad.connected;
+        if (wasConnected) {
+            virtualGamepad.connected = false;
+            BxEvent.dispatch(window, 'gamepaddisconnected', {
+                gamepad: { ...virtualGamepad, index: previousSlot },
+            });
+        }
+
+        this.resetXcloudGamepads();
+        window.BX_EXPOSED.toggleLocalCoOp(true);
+
+        if (wasConnected) {
+            virtualGamepad.connected = true;
+            virtualGamepad.timestamp = performance.now();
+            BxEvent.dispatch(window, 'gamepadconnected', { gamepad: virtualGamepad });
+        }
+    }
+
+    refreshLocalCoOpSlot() {
+        this.onPhysicalGamepadChanged({ gamepad: { id: '__refresh__' } } as GamepadEvent);
     }
 
     private pressButton(buttonIndex: GamepadKey, pressed: boolean) {
@@ -521,6 +579,8 @@ export class EmulatedMkbHandler extends MkbHandler {
 
         window.addEventListener('keydown', this.onKeyboardEvent);
         window.addEventListener('keyup', this.onKeyboardEvent);
+        window.addEventListener('gamepadconnected', this.onPhysicalGamepadChanged);
+        window.addEventListener('gamepaddisconnected', this.onPhysicalGamepadChanged);
 
         window.addEventListener(BxEvent.XCLOUD_POLLING_MODE_CHANGED, this.onPollingModeChanged);
         BxEventBus.Script.on('dialog.shown', this.onDialogShown);
@@ -564,6 +624,8 @@ export class EmulatedMkbHandler extends MkbHandler {
 
         window.removeEventListener('keydown', this.onKeyboardEvent);
         window.removeEventListener('keyup', this.onKeyboardEvent);
+        window.removeEventListener('gamepadconnected', this.onPhysicalGamepadChanged);
+        window.removeEventListener('gamepaddisconnected', this.onPhysicalGamepadChanged);
 
         if (AppInterface) {
             window.removeEventListener(BxEvent.POINTER_LOCK_REQUESTED, this);
@@ -590,9 +652,9 @@ export class EmulatedMkbHandler extends MkbHandler {
         this.isPolling = true;
         this.escKeyDownTime = -1;
 
-        window.BX_EXPOSED.toggleLocalCoOp(getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED));
         this.resetXcloudGamepads();
         window.navigator.getGamepads = this.patchedGetGamepads;
+        window.BX_EXPOSED.toggleLocalCoOp(getStreamPref(StreamPref.LOCAL_CO_OP_ENABLED));
 
         this.waitForMouseData(false);
 
