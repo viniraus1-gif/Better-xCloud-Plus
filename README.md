@@ -139,7 +139,7 @@ Recursos experimentais relacionados à interpolação ou geração de frames dep
 
 Esses recursos podem aumentar a suavidade visual, mas **não reduzem a latência dos comandos enviada ao servidor**.
 
-> Alguns desses recursos não estão disponíveis na versão Android.
+> Alguns desses recursos poderão não estar disponíveis na futura versão para Android.
 
 ### Resultados podem variar
 
@@ -208,18 +208,37 @@ O Tampermonkey detectará a versão instalada e permitirá realizar a atualizaç
 
 ---
 
-# 📱 Android — APK experimental
+# 📱 Android — Em desenvolvimento 🚧
 
-O projeto também possui uma versão experimental para Android localizada em:
+> [!CAUTION]
+> **A versão para Android ainda não está disponível para download.**
+>
+> O aplicativo está atualmente **em desenvolvimento e em fase de testes**. Uma versão pública será disponibilizada quando estiver suficientemente estável para uso.
 
-[`mobile-android`](mobile-android)
+Está sendo desenvolvida uma versão do **Better xCloud Plus para Android**, com o objetivo de levar os principais recursos do projeto para smartphones, tablets e outros dispositivos Android compatíveis.
 
-Ela utiliza um **WebView em tela cheia** para abrir o Xbox Cloud Gaming e carregar a versão compilada do Better xCloud Plus.
+A versão Android utilizará uma interface adaptada para dispositivos móveis e integração com o Xbox Cloud Gaming.
 
-> [!IMPORTANT]
-> O aplicativo não é um cliente nativo do Xbox Cloud Gaming e não substitui uma conta Microsoft, assinatura ou acesso elegível aos jogos.
+Durante o desenvolvimento estão sendo realizados testes de:
 
-Devido às diferenças entre Android, WebView e navegadores desktop, **algumas funções disponíveis no PC podem estar desativadas ou indisponíveis no Android**.
+- compatibilidade com diferentes versões do Android;
+- desempenho e estabilidade;
+- interface para telas sensíveis ao toque;
+- processamento visual;
+- compatibilidade com controles;
+- integração com o Xbox Cloud Gaming;
+- adaptação dos recursos disponíveis na versão para PC.
+
+> [!NOTE]
+> Nem todos os recursos disponíveis no PC estarão necessariamente disponíveis no Android. Algumas funções dependem de APIs, GPU ou recursos específicos dos navegadores desktop.
+
+### Status
+
+**🚧 Em desenvolvimento e testes — ainda não disponível publicamente.**
+
+Não existem APKs oficiais públicos do Better xCloud Plus no momento.
+
+Quando a versão Android estiver pronta para testes públicos ou lançamento, as informações e o download oficial serão publicados neste repositório.
 
 ---
 
