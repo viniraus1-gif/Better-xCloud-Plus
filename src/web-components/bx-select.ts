@@ -72,12 +72,22 @@ export class BxSelectElement extends HTMLSelectElement {
         // and keep the native select only as the value/form control.
         // Android already renders its native server selector correctly with
         // emoji/text. Keep the desktop-only image dropdown out of the APK.
-        const hasFlagOptions = !isAndroidAppBuild && self.optionsList.some($option => !!$option.dataset.flagCode);
+        // Some Xbox responses arrive from cache before `flagCode` was added
+        // to the region object. The emoji is still present, and is enough to
+        // derive the ISO code used by the image-based desktop control.
+        const hasFlagOptions = !isAndroidAppBuild && self.optionsList.some($option =>
+            !!($option.dataset.flagCode || BxSelectElement.getFlagCode($option))
+        );
         if (hasFlagOptions) {
-            $select.addEventListener('mousedown', e => {
+            // Capture pointerdown before Chromium performs its native select
+            // action. A bubbling mousedown listener is too late on some
+            // Windows builds, which is why the text-only list was still
+            // appearing in the supplied screenshots.
+            $select.addEventListener('pointerdown', e => {
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 BxSelectElement.toggleFlagDropdown.call(self, self);
-            });
+            }, true);
 
             $select.addEventListener('keydown', e => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -339,7 +349,7 @@ export class BxSelectElement extends HTMLSelectElement {
                 $dropdown.appendChild(CE('div', { class: 'bx-select-flag-dropdown-group' }, group));
             }
 
-            const flagCode = $option.dataset.flagCode;
+            const flagCode = BxSelectElement.getFlagCode($option);
             const $item = CE('button', {
                 class: 'bx-select-flag-dropdown-option',
                 type: 'button',
@@ -435,6 +445,20 @@ export class BxSelectElement extends HTMLSelectElement {
         $indicators.classList.toggle('bx-invisible', targetSize <= 1);
     }
 
+    private static getFlagCode($option: HTMLOptionElement): string {
+        if ($option.dataset.flagCode) {
+            return $option.dataset.flagCode;
+        }
+
+        const code = [...($option.dataset.flag || '')]
+            .map(char => char.codePointAt(0)! - 0x1F1E6)
+            .filter(value => value >= 0 && value < 26)
+            .map(value => String.fromCharCode(value + 65))
+            .join('')
+            .toLowerCase();
+        return code.length === 2 ? code : '';
+    }
+
     private static getOptionAtIndex(this: BxSelectElement, index: number): HTMLOptionElement | undefined {
         return this.optionsList[index];
     }
@@ -463,7 +487,7 @@ export class BxSelectElement extends HTMLSelectElement {
 
             content = $option.dataset.label || $option.textContent || '';
             const flag = $option.dataset.flag;
-            const flagCode = $option.dataset.flagCode;
+            const flagCode = BxSelectElement.getFlagCode($option);
             if (content && (hasLabel || flag || flagCode)) {
                 const groupLabel = $parent instanceof HTMLOptGroupElement ? $parent.label : '';
 

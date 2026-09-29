@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better xCloud Plus
 // @namespace    better-xcloud-plus
-// @version      1.0.1
+// @version      1.0.2
 // @description  Improve Xbox Cloud Gaming (xCloud) experience
 // @author       Better xCloud Plus contributors
 // @license      MIT
@@ -220,7 +220,7 @@ class UserAgent {
   });
  }
 }
-var SCRIPT_VERSION = "1.0.1", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
+var SCRIPT_VERSION = "1.0.2", SCRIPT_VARIANT = "full", AppInterface = window.AppInterface;
 UserAgent.init();
 var userAgent = window.navigator.userAgent.toLowerCase(), isTv = userAgent.includes("smart-tv") || userAgent.includes("smarttv") || /\baft.*\b/.test(userAgent), isVr = window.navigator.userAgent.includes("VR") && window.navigator.userAgent.includes("OculusBrowser"), browserHasTouchSupport = "ontouchstart" in window || navigator.maxTouchPoints > 0, userAgentHasTouchSupport = !isTv && !isVr && browserHasTouchSupport, STATES = {
  supportedRegion: !0,
@@ -5122,10 +5122,10 @@ class BxSelectElement extends HTMLSelectElement {
   self.isControllerFriendly = isControllerFriendly, self.isMultiple = $select.multiple, self.visibleIndex = $select.selectedIndex;
   let originalSetValue = $select.setValue;
   self.$select = $select, self.optionsList = Array.from($select.querySelectorAll("option")), self.$indicators = CE("div", { class: "bx-select-indicators" }), self.indicatorsList = [];
-  let hasFlagOptions = !isAndroidAppBuild && self.optionsList.some(($option) => !!$option.dataset.flagCode);
-  if (hasFlagOptions) $select.addEventListener("mousedown", (e) => {
-    e.preventDefault(), BxSelectElement.toggleFlagDropdown.call(self, self);
-   }), $select.addEventListener("keydown", (e) => {
+  let hasFlagOptions = !isAndroidAppBuild && self.optionsList.some(($option) => !!($option.dataset.flagCode || BxSelectElement.getFlagCode($option)));
+  if (hasFlagOptions) $select.addEventListener("pointerdown", (e) => {
+    e.preventDefault(), e.stopImmediatePropagation(), BxSelectElement.toggleFlagDropdown.call(self, self);
+   }, !0), $select.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") e.preventDefault(), BxSelectElement.toggleFlagDropdown.call(self, self);
    });
   let $btnPrev, $btnNext;
@@ -5236,7 +5236,7 @@ class BxSelectElement extends HTMLSelectElement {
   for (let [$index, $option] of this.optionsList.entries()) {
    let $parent = $option.parentElement, group = $parent instanceof HTMLOptGroupElement ? $parent.label : "";
    if (group && group !== currentGroup) currentGroup = group, $dropdown.appendChild(CE("div", { class: "bx-select-flag-dropdown-group" }, group));
-   let flagCode = $option.dataset.flagCode, $item = CE("button", {
+   let flagCode = BxSelectElement.getFlagCode($option), $item = CE("button", {
     class: "bx-select-flag-dropdown-option",
     type: "button",
     _dataset: { selected: $option.selected },
@@ -5277,6 +5277,11 @@ class BxSelectElement extends HTMLSelectElement {
    clearDataSet($indicator);
   $indicators.classList.toggle("bx-invisible", targetSize <= 1);
  }
+ static getFlagCode($option) {
+  if ($option.dataset.flagCode) return $option.dataset.flagCode;
+  let code = [...$option.dataset.flag || ""].map((char) => char.codePointAt(0) - 127462).filter((value) => value >= 0 && value < 26).map((value) => String.fromCharCode(value + 65)).join("").toLowerCase();
+  return code.length === 2 ? code : "";
+ }
  static getOptionAtIndex(index) {
   return this.optionsList[index];
  }
@@ -5295,7 +5300,7 @@ class BxSelectElement extends HTMLSelectElement {
   if ($option) {
    let $parent = $option.parentElement, hasLabel = $parent instanceof HTMLOptGroupElement || this.$select.querySelector("optgroup");
    content = $option.dataset.label || $option.textContent || "";
-   let flag = $option.dataset.flag, flagCode = $option.dataset.flagCode;
+   let flag = $option.dataset.flag, flagCode = BxSelectElement.getFlagCode($option);
    if (content && (hasLabel || flag || flagCode)) {
     let groupLabel = $parent instanceof HTMLOptGroupElement ? $parent.label : "";
     $label.innerHTML = "";
@@ -10097,7 +10102,7 @@ class HeaderSection {
    title: t("fullscreen"),
    style: 16 | 32 | 64 | 4096,
    onClick: this.onFullscreenClick
-  }), document.addEventListener("fullscreenchange", this.syncFullscreenButton), window.addEventListener(BxEvent.POPSTATE, () => window.setTimeout(this.updateFullscreenButton)), window.addEventListener(BxEvent.POPSTATE, this.scheduleHeaderRestore), BxEventBus.Stream.on("state.stopped", this.scheduleHeaderRestore), this.$buttonsWrapper = CE("div", !1, !getGlobalPref("block.features").includes("remote-play") ? this.$btnRemotePlay : null, this.$btnSettings), this.observeHeaderReplacement(), BxEventBus.Script.on("xcloud.server", ({ status }) => {
+  }), document.addEventListener("fullscreenchange", this.syncFullscreenButton), window.addEventListener(BxEvent.POPSTATE, () => window.setTimeout(this.updateFullscreenButton)), window.addEventListener(BxEvent.POPSTATE, this.scheduleHeaderRestore), BxEventBus.Stream.on("state.stopped", this.scheduleHeaderRestore), this.$buttonsWrapper = CE("div", !1, !getGlobalPref("block.features").includes("remote-play") ? this.$btnRemotePlay : null, this.$btnSettings), this.observeHeaderReplacement(), window.setTimeout(() => this.decorateLocaleButtons(), 500), BxEventBus.Script.on("xcloud.server", ({ status }) => {
    if (status === "ready") {
     STATES.isSignedIn = !0;
     let regionName = getPreferredServerRegion(), region = regionName ? STATES.serverRegions[regionName] : void 0, flagCode = region?.flagCode || [...region?.flag || ""].map((char) => String.fromCharCode(char.codePointAt(0) - 127462 + 65)).join("").toLowerCase(), $serverLabel = $btnSettings.querySelector("span"), serverName = (isAndroidAppBuild ? "" : region?.shortName.replace(region.flag || "", "").trim()) || getPreferredServerRegion(!0) || t("better-xcloud");
@@ -10114,17 +10119,21 @@ class HeaderSection {
   });
  }
  checkHeader = () => {
+  this.decorateLocaleButtons();
   let $header = document.querySelector("#gamepass-root header[class^=Header-module__header]");
   if (!$header) return;
-  $header.querySelectorAll("button").forEach(($button) => {
-   if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || "")) this.addLocaleFlag($button);
-  });
   let $target = $header.querySelector("div[class*=EdgewaterHeader-module__rightSectionSpacing], div[class*=RemotePlayHeader-module__rightSectionSpacing]");
   if (!$target) $target = document.querySelector("div[class^=UnsupportedMarketPage-module__buttons]");
   if (!$target) $target = Array.from($header.querySelectorAll("button")).filter(($button) => !$button.classList.contains("bx-header-settings-button")).at(-1)?.parentElement || $header.lastElementChild;
   if ($target?.appendChild(this.$buttonsWrapper), !STATES.isSignedIn) BxEventBus.Script.emit("xcloud.server", { status: "signed-out" });
   this.updateFullscreenButton();
  };
+ decorateLocaleButtons() {
+  if (isAndroidAppBuild) return;
+  document.querySelectorAll("button").forEach(($button) => {
+   if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || "")) this.addLocaleFlag($button);
+  });
+ }
  scheduleHeaderRestore = () => {
   if (this.headerRestoreTimers.forEach((timer) => clearTimeout(timer)), this.headerRestoreInterval !== null) clearInterval(this.headerRestoreInterval);
   this.headerRestoreTimers = [80, 350, 900].map((delay) => window.setTimeout(() => {
@@ -10138,12 +10147,10 @@ class HeaderSection {
  observeHeaderReplacement() {
   if (this.headerObserver) return;
   this.headerObserver = new MutationObserver(() => {
+   this.decorateLocaleButtons();
    let $header = document.querySelector("#gamepass-root header[class^=Header-module__header]");
    if (!$header) return;
-   if (!isAndroidAppBuild && $header.querySelectorAll("button").forEach(($button) => {
-    if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || "")) this.addLocaleFlag($button);
-   }), $header.contains(this.$buttonsWrapper) || this.headerCheckQueued)
-    return;
+   if ($header.contains(this.$buttonsWrapper) || this.headerCheckQueued) return;
    this.headerCheckQueued = !0, window.setTimeout(() => {
     this.headerCheckQueued = !1, this.checkHeader();
    }, 0);

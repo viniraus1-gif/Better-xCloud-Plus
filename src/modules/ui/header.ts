@@ -87,6 +87,10 @@ export class HeaderSection {
             this.$btnSettings,
         );
         this.observeHeaderReplacement();
+        // The Xbox market button can mount before, after, or outside the
+        // header we use to position Better xCloud controls. Scan once after
+        // that mount so its flag does not depend on a class-name match.
+        window.setTimeout(() => this.decorateLocaleButtons(), 500);
 
         BxEventBus.Script.on('xcloud.server', ({status}) => {
             if (status === 'ready') {
@@ -131,6 +135,7 @@ export class HeaderSection {
     }
 
     checkHeader = () => {
+        this.decorateLocaleButtons();
         const $header = document.querySelector('#gamepass-root header[class^=Header-module__header]');
         if (!$header) {
             return;
@@ -139,12 +144,6 @@ export class HeaderSection {
         // Xbox can render the market button outside the hub layout (for
         // example the compact "BR BRS" button). Decorate it here instead of
         // only while positioning the fullscreen button below.
-        $header.querySelectorAll<HTMLElement>('button').forEach($button => {
-            if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || '')) {
-                this.addLocaleFlag($button);
-            }
-        });
-
         let $target = $header.querySelector<HTMLElement>('div[class*=EdgewaterHeader-module__rightSectionSpacing], div[class*=RemotePlayHeader-module__rightSectionSpacing]');
         if (!$target) {
             $target = document.querySelector<HTMLElement>('div[class^=UnsupportedMarketPage-module__buttons]');
@@ -168,6 +167,18 @@ export class HeaderSection {
         }
 
         this.updateFullscreenButton();
+    }
+
+    private decorateLocaleButtons() {
+        if (isAndroidAppBuild) {
+            return;
+        }
+
+        document.querySelectorAll<HTMLElement>('button').forEach($button => {
+            if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || '')) {
+                this.addLocaleFlag($button);
+            }
+        });
     }
 
     // xCloud removes and rebuilds its header after a stream ends. Re-attach
@@ -205,18 +216,11 @@ export class HeaderSection {
         if (this.headerObserver) return;
 
         this.headerObserver = new MutationObserver(() => {
+            this.decorateLocaleButtons();
             const $header = document.querySelector<HTMLElement>('#gamepass-root header[class^=Header-module__header]');
             if (!$header) {
                 return;
             }
-
-            // React may re-render the market button while keeping our own
-            // controls intact. Restore its flag on every header mutation.
-            !isAndroidAppBuild && $header.querySelectorAll<HTMLElement>('button').forEach($button => {
-                if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || '')) {
-                    this.addLocaleFlag($button);
-                }
-            });
 
             if ($header.contains(this.$buttonsWrapper) || this.headerCheckQueued) {
                 return;
