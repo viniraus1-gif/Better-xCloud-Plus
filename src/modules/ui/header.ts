@@ -118,7 +118,7 @@ export class HeaderSection {
 
     checkHeader = () => {
         this.decorateLocaleButtons();
-        const $header = document.querySelector('#gamepass-root header[class^=Header-module__header]');
+        const $header = this.findHeader();
         if (!$header) {
             return;
         }
@@ -138,17 +138,27 @@ export class HeaderSection {
             const $lastHeaderButton = Array.from($header.querySelectorAll<HTMLElement>('button'))
                 .filter($button => !$button.classList.contains('bx-header-settings-button'))
                 .at(-1);
-            $target = $lastHeaderButton?.parentElement || $header.lastElementChild as HTMLElement | null;
+            $target = $lastHeaderButton?.parentElement
+                || ($header.lastElementChild as HTMLElement | null)
+                || $header;
         }
 
         // Add the Settings button to the web page
         $target?.appendChild(this.$buttonsWrapper);
+        this.$btnSettings.classList.remove('bx-gone');
 
         if (!STATES.isSignedIn) {
             BxEventBus.Script.emit('xcloud.server', { status: 'signed-out' });
         }
 
         this.updateFullscreenButton();
+    }
+
+    private findHeader() {
+        return document.querySelector<HTMLElement>('#gamepass-root header[class*=Header-module__header]')
+            || document.querySelector<HTMLElement>('#gamepass-root header')
+            || document.querySelector<HTMLElement>('header[class*=Header-module__header]')
+            || document.querySelector<HTMLElement>('header[class*=RemotePlayHeader-module__header]');
     }
 
     private decorateLocaleButtons() {
@@ -224,7 +234,7 @@ export class HeaderSection {
 
         this.headerObserver = new MutationObserver(() => {
             this.decorateLocaleButtons();
-            const $header = document.querySelector<HTMLElement>('#gamepass-root header[class^=Header-module__header]');
+            const $header = this.findHeader();
             if (!$header) {
                 return;
             }
@@ -272,7 +282,7 @@ export class HeaderSection {
     }
 
     private updateFullscreenButton = () => {
-        const $header = document.querySelector<HTMLElement>('#gamepass-root header[class^=Header-module__header]');
+        const $header = this.findHeader();
         if (!this.isHubPage() || !$header) {
             this.$btnFullscreen.remove();
             (window.BX_EXPOSED as any).hubFullscreenButton = null;

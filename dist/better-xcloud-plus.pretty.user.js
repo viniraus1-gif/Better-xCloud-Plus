@@ -10287,14 +10287,17 @@ class HeaderSection {
  }
  checkHeader = () => {
   this.decorateLocaleButtons();
-  let $header = document.querySelector("#gamepass-root header[class^=Header-module__header]");
+  let $header = this.findHeader();
   if (!$header) return;
   let $target = $header.querySelector("div[class*=EdgewaterHeader-module__rightSectionSpacing], div[class*=RemotePlayHeader-module__rightSectionSpacing]");
   if (!$target) $target = document.querySelector("div[class^=UnsupportedMarketPage-module__buttons]");
-  if (!$target) $target = Array.from($header.querySelectorAll("button")).filter(($button) => !$button.classList.contains("bx-header-settings-button")).at(-1)?.parentElement || $header.lastElementChild;
-  if ($target?.appendChild(this.$buttonsWrapper), !STATES.isSignedIn) BxEventBus.Script.emit("xcloud.server", { status: "signed-out" });
+  if (!$target) $target = Array.from($header.querySelectorAll("button")).filter(($button) => !$button.classList.contains("bx-header-settings-button")).at(-1)?.parentElement || $header.lastElementChild || $header;
+  if ($target?.appendChild(this.$buttonsWrapper), this.$btnSettings.classList.remove("bx-gone"), !STATES.isSignedIn) BxEventBus.Script.emit("xcloud.server", { status: "signed-out" });
   this.updateFullscreenButton();
  };
+ findHeader() {
+  return document.querySelector("#gamepass-root header[class*=Header-module__header]") || document.querySelector("#gamepass-root header") || document.querySelector("header[class*=Header-module__header]") || document.querySelector("header[class*=RemotePlayHeader-module__header]");
+ }
  decorateLocaleButtons() {
   document.querySelectorAll("button").forEach(($button) => {
    if (/^[a-z]{2}\s[a-z]{3}$/i.test($button.textContent?.trim() || "")) this.addLocaleFlag($button);
@@ -10326,7 +10329,7 @@ class HeaderSection {
   if (this.headerObserver) return;
   this.headerObserver = new MutationObserver(() => {
    this.decorateLocaleButtons();
-   let $header = document.querySelector("#gamepass-root header[class^=Header-module__header]");
+   let $header = this.findHeader();
    if (!$header) return;
    if ($header.contains(this.$buttonsWrapper) || this.headerCheckQueued) return;
    this.headerCheckQueued = !0, window.setTimeout(() => {
@@ -10350,7 +10353,7 @@ class HeaderSection {
   this.syncFullscreenButton();
  };
  updateFullscreenButton = () => {
-  let $header = document.querySelector("#gamepass-root header[class^=Header-module__header]");
+  let $header = this.findHeader();
   if (!this.isHubPage() || !$header) {
    this.$btnFullscreen.remove(), window.BX_EXPOSED.hubFullscreenButton = null;
    return;
