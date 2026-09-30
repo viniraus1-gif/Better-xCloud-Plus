@@ -392,10 +392,46 @@
                 margin: unset;
             }
         }
+
+        // A controller-friendly select contains the previous/next buttons
+        // as well as its value. Its intrinsic width is larger than a plain
+        // select, so let it use the full row width instead of pushing the
+        // last button outside of the settings pane.
+        > div.bx-select[data-controller-friendly=true] {
+            // Leave a small safety gutter at the right edge of the panel.
+            width: calc(100% - 12px);
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+
+            > div {
+                // calculateSelectBoxes() writes a measured min-width inline.
+                // It is useful on large screens, but must not force a long
+                // value beyond this compact settings pane.
+                min-width: 0 !important;
+            }
+        }
     }
 
     &.bx-settings-important-row {
         background: #733b00;
+    }
+}
+
+// Controller selectors are measured from their longest option. In the
+// settings sidebar that can exceed the pane's usable width, particularly on
+// compact stream resolutions. Keep every controller selector well inside
+// the edge, while leaving native mouse/keyboard selects untouched.
+.bx-settings-dialog div.bx-select[data-controller-friendly=true] {
+    max-width: calc(100% - 24px);
+    min-width: 0;
+    box-sizing: border-box;
+
+    > div,
+    > button.bx-select-value {
+        max-width: 100%;
+        box-sizing: border-box;
+        min-width: 0 !important;
     }
 }
 
