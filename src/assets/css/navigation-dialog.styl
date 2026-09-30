@@ -34,6 +34,16 @@
     }
 }
 
+// The settings dialog is mounted inside this navigation container. On some
+// xCloud layouts that container is constrained to the catalogue column,
+// causing a fixed child to stop in the middle of the real window. Give the
+// container the viewport while settings are open so its right edge is always
+// the actual screen edge.
+.bx-navigation-dialog:has(.bx-settings-dialog) {
+    position: fixed;
+    inset: 0;
+}
+
 .bx-navigation-dialog-overlay {
     position: fixed;
     // Keep the page visible behind the settings menu without compromising
