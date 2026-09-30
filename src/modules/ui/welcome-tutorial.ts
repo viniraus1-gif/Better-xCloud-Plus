@@ -11,9 +11,9 @@ import { NavigationDialogManager } from "@/modules/ui/dialog/navigation-dialog";
 /** A small first-visit guide for the web version. It is intentionally not a
  * setting: completing or dismissing it records the choice in local storage. */
 export class WelcomeTutorial {
-    // Version the completion marker so this expanded guided tour is shown once
-    // even to people who completed the earlier, text-only introduction.
-    private static readonly STORAGE_VALUE = '12';
+    // Version the completion marker so the current release can show its
+    // update summary once before the guided tour.
+    private static readonly STORAGE_VALUE = '13';
     private static replayListenerRegistered = false;
     private static lockedElements = new Map<HTMLElement, boolean>();
 
@@ -44,6 +44,7 @@ export class WelcomeTutorial {
         }
 
         const steps = [
+            { title: 'tutorial-updates-title', body: 'tutorial-updates-body', showMenu: false },
             { title: 'tutorial-intro-title', body: 'tutorial-intro-body', showMenu: false },
             { title: 'tutorial-about-title', body: 'tutorial-about-body', tab: 'global', showMenu: true },
             { title: 'tutorial-server-title', body: 'tutorial-server-body', tab: 'global', pref: GlobalPref.SERVER_REGION },

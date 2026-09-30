@@ -944,6 +944,8 @@ var SUPPORTED_LANGUAGES = {
  "waiting-for-input": "Waiting for input...",
  "tutorial-welcome-title": "Welcome to Better xCloud Plus",
  "tutorial-welcome-body": "This quick guide shows where the main controls are. You can change everything later in the menu.",
+ "tutorial-updates-title": "What's new in 0.0.2",
+ "tutorial-updates-body": "This update adds a guided tutorial, server selection with flags, improved local co-op, automatic Mouse & Keyboard profiles, and smoother VX frame generation. Let's take a quick tour.",
  "tutorial-intro-title": "Welcome",
  "tutorial-intro-body": "Get ready to make your xCloud experience more personal. This quick guide will show you the main features before you start playing.",
  "tutorial-about-title": "Meet Better xCloud Plus",
@@ -1008,6 +1010,8 @@ var SUPPORTED_LANGUAGES = {
   "vx-upscale-pipeline": "Stream → upscale espacial VX → saída local",
   "tutorial-welcome-title": "Bem-vindo ao Better xCloud Plus",
   "tutorial-welcome-body": "Este guia rápido mostra onde ficam os controles principais. Você pode alterar tudo depois pelo menu.",
+  "tutorial-updates-title": "Novidades da versão 0.0.2",
+  "tutorial-updates-body": "Esta atualização adiciona um tutorial guiado, seleção de servidores com bandeiras, cooperativo local aprimorado, perfis automáticos de mouse e teclado e geração de frames VX mais uniforme. Vamos fazer um tour rápido.",
   "tutorial-intro-title": "Bem-vindo",
   "tutorial-intro-body": "Prepare-se para deixar sua experiência no xCloud mais personalizada. Este guia rápido mostra os recursos principais antes de você começar a jogar.",
   "tutorial-about-title": "Conheça o Better xCloud Plus",
@@ -12263,7 +12267,7 @@ class CloudKeepAlive {
  }
 }
 class WelcomeTutorial {
- static STORAGE_VALUE = "12";
+ static STORAGE_VALUE = "13";
  static replayListenerRegistered = !1;
  static lockedElements = new Map;
  static setup() {
@@ -12278,6 +12282,7 @@ class WelcomeTutorial {
  static render() {
   if (document.querySelector(".bx-welcome-tutorial")) return;
   let steps = [
+   { title: "tutorial-updates-title", body: "tutorial-updates-body", showMenu: !1 },
    { title: "tutorial-intro-title", body: "tutorial-intro-body", showMenu: !1 },
    { title: "tutorial-about-title", body: "tutorial-about-body", tab: "global", showMenu: !0 },
    { title: "tutorial-server-title", body: "tutorial-server-body", tab: "global", pref: "server.region" },
