@@ -171,7 +171,10 @@ export class WebGL2Player extends BaseCanvasPlayer {
             ? Math.min(maxMultiplier, targetMultiplier)
             : maxMultiplier;
 
-        return Math.min(requestedMultiplier, this.getLatencyProtectedOptions().frameGenerationLimit);
+        // Frame generation is the feature the player explicitly enabled.
+        // The latency guard can simplify its spatial effects, but must not
+        // silently turn a selected 3×/4× (or custom) cadence into 2×.
+        return requestedMultiplier;
     }
 
     private presentGeneratedFrames(multiplier: number, onComplete: () => void) {
@@ -192,7 +195,15 @@ export class WebGL2Player extends BaseCanvasPlayer {
         const requestedOutputFps = this.options.vxFrameGeneration === VxFrameGenerationMode.CUSTOM
             ? this.options.vxFrameTargetFps
             : sourceFps * multiplier;
-        const presentationInterval = 1000 / Math.max(1, requestedOutputFps);
+        // Never schedule more presentation slots than this multiplier can
+        // create between two base frames. With a 10 FPS cap and the 8× custom
+        // ceiling, scheduling a 120 FPS target used to draw eight images in
+        // a short burst and then leave a long gap, which still looked like
+        // 10 FPS. Use the attainable cadence so those images are evenly
+        // spaced across the whole source-frame interval.
+        const attainableOutputFps = sourceFps * multiplier;
+        const effectiveOutputFps = Math.min(requestedOutputFps, attainableOutputFps);
+        const presentationInterval = 1000 / Math.max(1, effectiveOutputFps);
         const startedAt = performance.now();
 
         // Canvas updates are only visible on a compositor refresh. Align each

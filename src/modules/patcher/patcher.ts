@@ -912,15 +912,56 @@ if (this.baseStorageKey in window.BX_EXPOSED.overrideSettings) {
 
         index = str.indexOf('{', index) + 1;
         str = PatcherUtils.insertAt(str, index, `
-if (window.BX_EXPOSED.hubFullscreenButton && e instanceof HTMLElement) {
-    const bxFocusText = (e.textContent || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
-    if (bxFocusText.includes('experimentar a nova experiencia') || bxFocusText.includes('try the new experience')) {
-        e = window.BX_EXPOSED.hubFullscreenButton;
-    }
-}
+window.BX_EXPOSED.setHubNavigationFocus = t.setCurrentFocus;
+window.BX_EXPOSED.hubCurrentNavigationFocus = e;
 e && BxEvent.dispatch(window, BxEvent.NAVIGATION_FOCUS_CHANGED, { element: e });
 `);
         return str;
+    },
+
+    /**
+     * Join the injected fullscreen button to Xbox's native spatial-navigation
+     * graph. DOM insertion alone is insufficient because the graph stops at
+     * the market picker and never asks setCurrentFocus() for another target.
+     */
+    patchSpatialNavigation(str: string) {
+        const text = '.spatialNavigate=e=>{';
+        const index = str.indexOf(text);
+        if (index < 0) {
+            return false;
+        }
+
+        return PatcherUtils.insertAt(str, index + text.length, `
+const bxFullscreenButton = window.BX_EXPOSED.hubFullscreenButton;
+const bxMarketButton = window.BX_EXPOSED.hubFullscreenMarketButton;
+const bxCurrentFocus = window.BX_EXPOSED.hubCurrentNavigationFocus;
+if (bxFullscreenButton?.isConnected && bxMarketButton?.isConnected) {
+    // Depending on the current Xbox shell, its focus manager can retain a
+    // synthetic element while the real DOM button owns :focus. Check both,
+    // plus the shared native header action group, before handling Right.
+    const bxActiveElement = document.activeElement;
+    const bxCurrentFocusIsNode = bxCurrentFocus instanceof Node;
+    const bxMarketOwnsFocus = bxCurrentFocus === bxMarketButton
+        || bxCurrentFocusIsNode && bxMarketButton.contains(bxCurrentFocus)
+        || bxMarketButton === bxActiveElement
+        || bxMarketButton.contains(bxActiveElement)
+        || bxMarketButton.parentElement?.contains(bxActiveElement);
+    if (e === 'right' && bxMarketOwnsFocus) {
+        if (window.BX_EXPOSED.setHubNavigationFocus) {
+            window.BX_EXPOSED.setHubNavigationFocus(bxFullscreenButton);
+        } else {
+            bxFullscreenButton.focus();
+            window.BX_EXPOSED.hubCurrentNavigationFocus = bxFullscreenButton;
+        }
+        return;
+    }
+
+    if (e === 'left' && bxCurrentFocus === bxFullscreenButton) {
+        window.BX_EXPOSED.setHubNavigationFocus?.(bxMarketButton);
+        return;
+    }
+}
+`);
     },
 
     detectProductDetailPage(str: string) {
@@ -1358,6 +1399,11 @@ let PATCH_ORDERS = PatcherUtils.filterPatches([
     'broadcastPollingMode',
 
     'patchGamepadPolling',
+
+    // Integrate Better xCloud header controls with Xbox's native controller
+    // focus manager and directional navigation graph.
+    'patchSetCurrentFocus',
+    'patchSpatialNavigation',
 
     'modifyPreloadedState',
 

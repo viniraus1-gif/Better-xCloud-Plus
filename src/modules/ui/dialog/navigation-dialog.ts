@@ -154,6 +154,9 @@ export class NavigationDialogManager {
     private menuComboPollingIntervalId: number | null = null;
     private menuComboStates: Record<number, boolean> = {};
     private gamepadPollingWasDisabled = false;
+    private gamepadInputCapture: ((button: GamepadKey) => void) | null = null;
+    private gamepadInputCaptureWasDisabled = false;
+    private gamepadInputCaptureWasShowing = false;
 
     private $overlay: HTMLElement;
     private $container: HTMLElement;
@@ -175,6 +178,12 @@ export class NavigationDialogManager {
 
         this.$container = CE('div', { class: 'bx-navigation-dialog bx-gone' });
         document.documentElement.appendChild(this.$container);
+
+        // Some xCloud catalogue layouts constrain the navigation portal to a
+        // content column even though it is mounted under <html>. Re-align the
+        // settings panel against the real viewport whenever that layout moves.
+        window.addEventListener('resize', this.alignSettingsDialogToViewport);
+        window.visualViewport?.addEventListener('resize', this.alignSettingsDialogToViewport);
 
         // Switch the settings controls back to their mouse/keyboard layout as
         // soon as the user touches the pointer inside the menu.
@@ -205,6 +214,23 @@ export class NavigationDialogManager {
         // expose a keyboard event for this controller combination there.
         this.startMenuComboPolling();
     }
+
+    private alignSettingsDialogToViewport = () => {
+        const $settings = this.$container.querySelector<HTMLElement>('.bx-settings-dialog');
+        if (!$settings || this.$container.classList.contains('bx-gone')) {
+            return;
+        }
+
+        // Measure from the neutral CSS position first. If an ancestor creates
+        // a smaller containing block, use a negative right offset to bridge
+        // the difference to the browser's actual right edge.
+        $settings.style.right = '0px';
+        const viewportRight = window.innerWidth;
+        const panelRight = $settings.getBoundingClientRect().right;
+        const missingSpace = viewportRight - panelRight;
+
+        $settings.style.right = Math.abs(missingSpace) > 1 ? `${-missingSpace}px` : '0px';
+    };
 
     private updateActiveInput(input: 'keyboard' | 'gamepad' | 'mouse') {
         // Set <html>'s activeInput
@@ -405,6 +431,15 @@ export class NavigationDialogManager {
     }
 
     private handleGamepad(gamepad: Gamepad, key: GamepadKey): boolean {
+        // A modal that lives outside this manager (the welcome tutorial, for
+        // example) can still claim controller input.  Do this before asking
+        // the active settings dialog so its controls cannot be changed behind
+        // the modal.
+        if (this.gamepadInputCapture) {
+            this.gamepadInputCapture(key);
+            return true;
+        }
+
         let handled = this.dialog?.handleGamepad(key);
         if (handled) {
             return true;
@@ -438,6 +473,43 @@ export class NavigationDialogManager {
         return true;
     }
 
+    /** Temporarily reserve every physical-controller action for an external
+     * modal. The returned function must be called when that modal closes. */
+    captureGamepadInput(handler: (button: GamepadKey) => void): () => void {
+        this.gamepadInputCaptureWasDisabled = window.BX_EXPOSED.disableGamepadPolling;
+        this.gamepadInputCaptureWasShowing = window.BX_EXPOSED.isNavigationDialogShowing;
+        this.gamepadInputCapture = handler;
+
+        // Stop xCloud (and the native MKB bridge) from receiving the same
+        // controller input while the modal is on screen.
+        window.BX_EXPOSED.isNavigationDialogShowing = true;
+        window.BX_EXPOSED.disableGamepadPolling = true;
+        this.startGamepadPolling();
+
+        return () => {
+            if (this.gamepadInputCapture !== handler) {
+                return;
+            }
+
+            this.gamepadInputCapture = null;
+            this.clearGamepadHoldingInterval();
+
+            if (this.isShowing()) {
+                // A real navigation dialog remains responsible for the
+                // controller after the external modal is gone.
+                window.BX_EXPOSED.isNavigationDialogShowing = true;
+                window.BX_EXPOSED.disableGamepadPolling = true;
+                return;
+            }
+
+            window.BX_EXPOSED.isNavigationDialogShowing = this.gamepadInputCaptureWasShowing;
+            window.BX_EXPOSED.disableGamepadPolling = this.gamepadInputCaptureWasDisabled;
+            if (!this.gamepadInputCaptureWasShowing) {
+                this.stopGamepadPolling();
+            }
+        };
+    }
+
     private clearGamepadHoldingInterval() {
         this.gamepadHoldingIntervalId && window.clearInterval(this.gamepadHoldingIntervalId);
         this.gamepadHoldingIntervalId = null;
@@ -451,6 +523,10 @@ export class NavigationDialogManager {
         // Stop xCloud's navigation polling
         if (!window.BX_EXPOSED.isNavigationDialogShowing) {
             this.gamepadPollingWasDisabled = window.BX_EXPOSED.disableGamepadPolling;
+        } else if (this.gamepadInputCapture) {
+            // The capture already stopped xCloud before this dialog opened;
+            // preserve the state from before that capture for a later hide.
+            this.gamepadPollingWasDisabled = this.gamepadInputCaptureWasDisabled;
         }
         window.BX_EXPOSED.isNavigationDialogShowing = true;
         window.BX_EXPOSED.disableGamepadPolling = true;
@@ -482,6 +558,7 @@ export class NavigationDialogManager {
 
         // Show content
         this.$container.classList.remove('bx-gone');
+        window.requestAnimationFrame(this.alignSettingsDialogToViewport);
 
         // Add event listeners
         this.$container.addEventListener('keydown', this);
@@ -510,7 +587,9 @@ export class NavigationDialogManager {
         this.$container.removeEventListener('keydown', this);
 
         // Stop gamepad polling
-        this.stopGamepadPolling();
+        if (!this.gamepadInputCapture) {
+            this.stopGamepadPolling();
+        }
 
         // Remove current dialog and everything after it from dialogs stack
         if (this.dialog) {
@@ -524,8 +603,8 @@ export class NavigationDialogManager {
         this.unmountCurrentDialog();
 
         const hasPreviousDialog = this.dialogsStack.length > 0;
-        window.BX_EXPOSED.isNavigationDialogShowing = hasPreviousDialog;
-        window.BX_EXPOSED.disableGamepadPolling = hasPreviousDialog
+        window.BX_EXPOSED.isNavigationDialogShowing = hasPreviousDialog || !!this.gamepadInputCapture;
+        window.BX_EXPOSED.disableGamepadPolling = hasPreviousDialog || !!this.gamepadInputCapture
             ? true
             : this.gamepadPollingWasDisabled;
 

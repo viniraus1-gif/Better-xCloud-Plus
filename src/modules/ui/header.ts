@@ -73,6 +73,11 @@ export class HeaderSection {
             style: ButtonStyle.FROSTED | ButtonStyle.DROP_SHADOW | ButtonStyle.FOCUSABLE | ButtonStyle.NORMAL_CASE,
             onClick: this.onFullscreenClick,
         });
+        // A mouse click moves DOM focus without going through xCloud's
+        // controller focus manager. Keep the visual controller state in sync
+        // so switching back to a controller does not leave a stale highlight
+        // on the adjacent market button.
+        this.$btnFullscreen.addEventListener('focus', this.onFullscreenFocus);
 
         document.addEventListener('fullscreenchange', this.syncFullscreenButton);
         // The patched history event fires immediately before the URL changes.
@@ -267,6 +272,12 @@ export class HeaderSection {
         void this.toggleFullscreen();
     }
 
+    private onFullscreenFocus = () => {
+        BxEvent.dispatch(window, BxEvent.NAVIGATION_FOCUS_CHANGED, {
+            element: this.$btnFullscreen,
+        });
+    }
+
     private toggleFullscreen = async () => {
         try {
             if (nativeFullscreenElementGetter?.call(document) === document.documentElement) {
@@ -286,6 +297,7 @@ export class HeaderSection {
         if (!this.isHubPage() || !$header) {
             this.$btnFullscreen.remove();
             (window.BX_EXPOSED as any).hubFullscreenButton = null;
+            (window.BX_EXPOSED as any).hubFullscreenMarketButton = null;
             return;
         }
 
@@ -310,6 +322,7 @@ export class HeaderSection {
         // navigation reaches the adjacent native CTA, it redirects the focus
         // to this button and A activates it like any other xCloud control.
         (window.BX_EXPOSED as any).hubFullscreenButton = this.$btnFullscreen;
+        (window.BX_EXPOSED as any).hubFullscreenMarketButton = this.$localeButton;
 
         const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find($button => {

@@ -3,7 +3,7 @@ import { limitVideoPlayerFps, onChangeCompetitiveMode, onChangeVideoPlayerType, 
 import { StreamStats } from "./stream/stream-stats";
 import { SoundShortcut } from "./shortcuts/sound-shortcut";
 import { STATES } from "@/utils/global";
-import { getGamePref, getStreamPref, hasGamePref, isStreamPref, setGameIdPref, setGamePref, STORAGE } from "@/utils/pref-utils";
+import { getGamePref, getGlobalPref, getStreamPref, hasGamePref, isStreamPref, setGameIdPref, setGamePref, STORAGE } from "@/utils/pref-utils";
 import { BxExposed } from "@/utils/bx-exposed";
 import { StreamSettings } from "@/utils/stream-settings";
 import { NativeMkbHandler } from "./mkb/native-mkb-handler";
@@ -17,6 +17,7 @@ import { EmulatedMkbHandler } from "./mkb/mkb-handler";
 import { addCss } from "@/utils/css";
 import { Toast } from "@/utils/toast";
 import { VxFrameGenerationMode, VxUpscaleTarget } from "@/enums/pref-values";
+import { getSuggestedMkbPresetForTitle, MkbMappingDefaultPresetId } from "@/utils/local-db/mkb-mapping-presets-table";
 
 type SettingType = Partial<{
     hidden: true;
@@ -409,6 +410,28 @@ export class SettingsManager {
         BxEventBus.Stream.on('xboxTitleId.changed', async ({ id }) => {
             this.playingGameId = id;
 
+            const title = id > 0 ? await XboxApi.getProductTitle(id) : undefined;
+            // Use the genre profile when recognized, otherwise give every
+            // game a predictable Standard mapping instead of inheriting an
+            // unrelated profile from the previous game.
+            const suggestedMkbPreset = id > 0
+                ? getSuggestedMkbPresetForTitle(title) ?? {
+                    id: MkbMappingDefaultPresetId.DEFAULT,
+                    name: t('standard'),
+                }
+                : null;
+            const hasCustomMkbPreset = hasGamePref(id, StreamPref.MKB_P1_MAPPING_PRESET_ID);
+            const globalMkbPreset = getGamePref(-1, StreamPref.MKB_P1_MAPPING_PRESET_ID, true);
+            const shouldApplySuggestedMkbPreset = !!suggestedMkbPreset
+                && !hasCustomMkbPreset
+                && globalMkbPreset !== suggestedMkbPreset.id;
+
+            // A game-specific choice always wins. Otherwise, initialize this
+            // game's controller-emulation mapping from its detected genre.
+            if (shouldApplySuggestedMkbPreset && suggestedMkbPreset) {
+                setGamePref(id, StreamPref.MKB_P1_MAPPING_PRESET_ID, suggestedMkbPreset.id, 'direct');
+            }
+
             // Only switch to game settings if it's not empty
             const gameSettings = STORAGE.Stream.getGameSettings(id);
             const selectedId = (gameSettings && !gameSettings.isEmpty()) ? id : -1;
@@ -423,7 +446,6 @@ export class SettingsManager {
 
             // Add current game to the selection
             if (id >= 0) {
-                const title = id === 0 ? 'Xbox' : await XboxApi.getProductTitle(id);
                 $optGroup.appendChild(CE('option', {
                     value: id,
                 }, title));
@@ -433,6 +455,10 @@ export class SettingsManager {
 
             $select.value = selectedId.toString();
             BxEventBus.Stream.emit('gameSettings.switched', { id: selectedId });
+
+            if (shouldApplySuggestedMkbPreset && suggestedMkbPreset && getGlobalPref(GlobalPref.MKB_ENABLED)) {
+                Toast.show(`${t('mkb-profile-auto-applied')} ${suggestedMkbPreset.name}. ${t('mkb-profile-auto-warning')}`, '⚠️', { instant: true });
+            }
         });
     }
 

@@ -5,6 +5,8 @@ import { t } from "@/utils/translation";
 import { ButtonStyle, CE, createButton } from "@/utils/html";
 import { PrompFont } from "@/enums/prompt-font";
 import { BxEvent } from "@/utils/bx-event";
+import { GamepadKey } from "@/enums/gamepad";
+import { NavigationDialogManager } from "@/modules/ui/dialog/navigation-dialog";
 
 /** A small first-visit guide for the web version. It is intentionally not a
  * setting: completing or dismissing it records the choice in local storage. */
@@ -130,13 +132,51 @@ export class WelcomeTutorial {
                 $continue.focus();
             }
         };
+        let releaseGamepadCapture = () => {};
         const releaseInputLock = () => {
+            releaseGamepadCapture();
             document.removeEventListener('keydown', blockKeyboardOutsideTutorial, true);
             document.removeEventListener('keyup', blockKeyboardOutsideTutorial, true);
             document.removeEventListener('keypress', blockKeyboardOutsideTutorial, true);
             document.removeEventListener('focusin', keepFocusInTutorial, true);
             unlockScrolling();
             WelcomeTutorial.unlockPage();
+        };
+
+        const handleTutorialGamepad = (button: GamepadKey) => {
+            const $buttons = Array.from($overlay.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
+            if (!$buttons.length) {
+                return;
+            }
+
+            const $focused = document.activeElement instanceof HTMLButtonElement
+                && $overlay.contains(document.activeElement)
+                ? document.activeElement
+                : $continue;
+            const focusedIndex = Math.max(0, $buttons.indexOf($focused));
+
+            if (button === GamepadKey.A) {
+                $focused.click();
+                return;
+            }
+
+            if (button === GamepadKey.B) {
+                // B follows the tutorial's Back button when that action is
+                // available, but never dismisses the tutorial into the hub.
+                if (!$back.hasAttribute('disabled')) {
+                    $back.click();
+                }
+                return;
+            }
+
+            if ([GamepadKey.UP, GamepadKey.LEFT, GamepadKey.LS_UP, GamepadKey.LS_LEFT].includes(button)) {
+                $buttons[(focusedIndex - 1 + $buttons.length) % $buttons.length]!.focus();
+                return;
+            }
+
+            if ([GamepadKey.DOWN, GamepadKey.RIGHT, GamepadKey.LS_DOWN, GamepadKey.LS_RIGHT].includes(button)) {
+                $buttons[(focusedIndex + 1) % $buttons.length]!.focus();
+            }
         };
 
         const update = () => {
@@ -212,6 +252,7 @@ export class WelcomeTutorial {
         document.addEventListener('keypress', blockKeyboardOutsideTutorial, true);
         document.addEventListener('focusin', keepFocusInTutorial, true);
         $continue.focus();
+        releaseGamepadCapture = NavigationDialogManager.getInstance().captureGamepadInput(handleTutorialGamepad);
         window.setTimeout(update, 50);
     }
 

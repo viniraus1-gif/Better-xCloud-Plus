@@ -4,11 +4,6 @@
     top: 0;
     right: 0;
     bottom: 0;
-    // Keep the settings as a right-side panel. The compact controller layout
-    // below makes its controls fit without turning the menu into full screen.
-    width: min(606px, 88vw);
-    max-width: 88vw;
-    overflow: hidden;
     transform-origin: right center;
     animation: bx-settings-menu-open 220ms cubic-bezier(.18, .8, .22, 1) both;
     opacity: 0.98;
@@ -110,10 +105,7 @@
 }
 
 .bx-settings-tabs-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    position: fixed;
     width: 156px;
     max-height: 100vh;
     display: flex;
@@ -304,8 +296,12 @@
     }
 
     .bx-settings-tab-contents {
-        width: calc(100% - 48px);
-        max-width: calc(100% - 48px);
+        // The dialog itself deliberately has no fixed width so it can keep
+        // the legacy right-side position. Size only this inner pane against
+        // the viewport, otherwise its desktop 450px width overflows a small
+        // controller screen.
+        width: calc(100vw - 48px);
+        max-width: calc(100vw - 48px);
         margin-left: 48px;
     }
 

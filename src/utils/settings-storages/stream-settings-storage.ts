@@ -588,10 +588,14 @@ export class StreamSettingsStorage extends BaseSettingsStorage<StreamPref> {
             let gameValue = gameSettings.getSetting(key, checkUnsupported);
             const globalValue = super.getSetting(key, checkUnsupported);
 
-            // Remove value if it's the same as global's
+            // Remove value if it's the same as global's. The MKB mapping is
+            // the exception: an explicit per-game "Standard" choice must
+            // remain stored so automatic game profiles cannot replace it.
             if (globalValue === gameValue) {
-                this.deleteSettingByGame(id, key as StreamPref);
-                gameValue = globalValue;
+                if (key !== StreamPref.MKB_P1_MAPPING_PRESET_ID) {
+                    this.deleteSettingByGame(id, key as StreamPref);
+                    gameValue = globalValue;
+                }
             }
 
             return gameValue;

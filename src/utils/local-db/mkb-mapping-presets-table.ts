@@ -24,11 +24,7 @@ export type MkbPresetSuggestion = {
     name: string;
 };
 
-/**
- * Suggests a keyboard/mouse layout from the game title only. It deliberately
- * never applies a preset: genres are often mixed and the player's layout is
- * more important than a heuristic.
- */
+/** Returns a keyboard/mouse layout that best matches the game's title. */
 export function getSuggestedMkbPresetForTitle(title?: string): MkbPresetSuggestion | null {
     if (!title) return null;
 
